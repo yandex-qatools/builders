@@ -1,5 +1,4 @@
 import construct
-
 from builders.logger import logger
 
 
@@ -212,6 +211,19 @@ class Enabled(ConstructModifier):
 
     def doApply(self, construct):
         construct.enabled = True
+
+
+class LambdaModifier(ConstructModifier):
+    """
+    Replaces function in :py:class:`builders.construct.Lambda` with given new_lambda
+    """
+    def __init__(self, construct, new_lambda):
+        ConstructModifier.__init__(self, construct)
+        self.value = new_lambda
+
+    def doApply(self, modified_construct):
+        if isinstance(modified_construct, construct.Lambda):
+            modified_construct.alternative_function = self.value
 
 
 class ValuesMixin:
