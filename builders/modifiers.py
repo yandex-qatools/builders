@@ -221,9 +221,11 @@ class LambdaModifier(ConstructModifier):
         ConstructModifier.__init__(self, construct)
         self.value = new_lambda
 
-    def doApply(self, modified_construct):
-        if isinstance(modified_construct, construct.Lambda):
-            modified_construct.alternative_function = self.value
+    def doApply(self, lambda_construct):
+        if isinstance(lambda_construct, construct.Lambda):
+            lambda_construct.alternative_function = self.value
+        else:
+            raise TypeError("This modifier is applicable only for Lambda construct and it's children")
 
 
 class ValuesMixin:
