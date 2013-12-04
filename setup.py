@@ -8,10 +8,11 @@ import setuptools
 setuptools.setup(
     name=info.__package_name__,
     version=info.__version__,
-    description="Builders for abstract models",
+    license="Apache",
     author="Ivan Kalinin",
     author_email="pupssman@yandex-team.ru",
-    url="http://wiki.yandex-team.ru/",
+    url="http://github.com/yandex-qatools/builders",
     packages=["builders"],
-    long_description="""This module provides abstract tree building capability""",
+    description="Lightweight test data generation framework",
+    long_description=open('doc/tutorial.rst').read(),
 )
