@@ -1,4 +1,4 @@
-from builders.construct import Unique, Collection, Uplink, Maybe, Lambda
+from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
 from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn,\
     OneOf, Enabled, ValuesMixin, LambdaModifier
 from builders.builder import Builder
@@ -222,6 +222,14 @@ def test_lambda_modifier_function_is_set_back():
 
     Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build()
     assert Builder(A).build().a == 1
+
+
+def test_lambda_modifier_raises_given_not_lambda():
+    class A:
+        a = Random()
+
+    with pytest.raises(TypeError):
+        Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build()
 
 
 class Foo(ValuesMixin):
