@@ -157,5 +157,6 @@ Useful built-in modifiers are:
 * :py:class:`builders.modifiers.NumberOf` that sets ``Collection`` sizes
 * :py:class:`builders.modifiers.OneOf` that modifies a ``Collection`` entry
 * :py:class:`builders.modifiers.Enabled` that turns on :py:class:`builders.construct.Maybe`
+* :py:class:`builders.construct.LambdaModifier` replaces default function in :py:class:`builders.construct.Lambda` with a given one
 
 All the built-in modifiers can be found in :py:mod:`builders.modifiers`.
