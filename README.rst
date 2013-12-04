@@ -8,8 +8,6 @@ Online documentation:
 
  * http://jenkins.qatools.ru/job/python-builders-release/Sphinx_Documentation/
 
-Developers
-==========
 Source control:
 
  * https://github.com/yandex-qatools/builders.git
