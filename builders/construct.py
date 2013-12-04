@@ -9,7 +9,7 @@ import uuid
 from builders.logger import logger
 
 
-__all__ = ['Construct', 'Predefined', 'Unique', 'Collection', 'Reused', 'Random', 'Maybe', 'Uplink', 'Uid', 'Key']
+__all__ = ['Construct', 'Predefined', 'Unique', 'Collection', 'Reused', 'Random', 'Maybe', 'Uplink', 'Uid', 'Key', 'Lambda']
 
 
 class Link:
@@ -92,10 +92,16 @@ class Lambda(Construct):
     Function, executed during each build with an instance being constructed passed in as parameter
     """
     def __init__(self, functionToExecute):
-        self.function = functionToExecute
+        self.default_function = functionToExecute
+        self.alternative_function = None
 
     def doBuild(self, modifiers, **kwargs):
-        return self.function(kwargs['instance'])
+        if not self.alternative_function:
+            value = self.default_function(kwargs['instance'])
+        else:
+            value = self.alternative_function(kwargs['instance'])
+            self.alternative_function = None
+        return value
 
 
 class Collection(Unique):

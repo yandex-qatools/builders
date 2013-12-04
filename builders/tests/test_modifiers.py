@@ -1,6 +1,6 @@
-from builders.construct import Unique, Collection, Uplink, Maybe
+from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
 from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn,\
-    OneOf, Enabled, ValuesMixin
+    OneOf, Enabled, ValuesMixin, LambdaModifier
 from builders.builder import Builder
 import pytest
 
@@ -207,6 +207,29 @@ def test_sum():
     mod_2 = InstanceModifier(B).thatSets(x=1)
 
     assert mod_1 + mod_2 == [mod_1, mod_2]
+
+
+def test_lambda_modifier_changes_function():
+    class A:
+        a = Lambda(lambda _: 1)
+
+    assert Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build().a == 2
+
+
+def test_lambda_modifier_function_is_set_back():
+    class A:
+        a = Lambda(lambda _: 1)
+
+    Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build()
+    assert Builder(A).build().a == 1
+
+
+def test_lambda_modifier_raises_given_not_lambda():
+    class A:
+        a = Random()
+
+    with pytest.raises(TypeError):
+        Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build()
 
 
 class Foo(ValuesMixin):

@@ -1,5 +1,4 @@
 import construct
-
 from builders.logger import logger
 
 
@@ -212,6 +211,21 @@ class Enabled(ConstructModifier):
 
     def doApply(self, construct):
         construct.enabled = True
+
+
+class LambdaModifier(ConstructModifier):
+    """
+    Replaces function in :py:class:`builders.construct.Lambda` with given new_lambda
+    """
+    def __init__(self, construct, new_lambda):
+        ConstructModifier.__init__(self, construct)
+        self.value = new_lambda
+
+    def doApply(self, lambda_construct):
+        if isinstance(lambda_construct, construct.Lambda):
+            lambda_construct.alternative_function = self.value
+        else:
+            raise TypeError("This modifier is applicable only for Lambda construct and it's children, but instead got %s" % type(lambda_construct))
 
 
 class ValuesMixin:
