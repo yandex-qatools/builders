@@ -225,7 +225,7 @@ class LambdaModifier(ConstructModifier):
         if isinstance(lambda_construct, construct.Lambda):
             lambda_construct.alternative_function = self.value
         else:
-            raise TypeError("This modifier is applicable only for Lambda construct and it's children")
+            raise TypeError("This modifier is applicable only for Lambda construct and it's children, but instead got %s" % type(lambda_construct))
 
 
 class ValuesMixin:
