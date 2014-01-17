@@ -35,7 +35,32 @@ class Modifier:
         return [self, other]
 
 
-def InstanceModifier(classToRunOn):
+class _ParticularClassModifier(Modifier):
+    def __init__(self, classToRunOn, action):
+        self.classToRunOn = classToRunOn
+        self.action = action
+
+    def shouldRun(self, instance=None, **kwargs):
+        return isinstance(instance, self.classToRunOn)
+
+    def apply(self, instance=None, **kwargs):
+        if instance:
+            return self.action(instance)
+
+
+class _setter:
+    def __init__(self, kwargs, careful=False):
+        self.kwargs = kwargs
+        self.careful = careful
+
+    def __call__(self, instance):
+        for (k, v) in self.kwargs.items():
+            if self.careful:
+                assert hasattr(instance, k), '<%s> is missing attribute <%s>' % (instance, k)
+            setattr(instance, k, v)
+
+
+class InstanceModifier:
     """
     Modifier factory that builds new modifiers to act upon instances of ``classToRunOn``.
 
@@ -45,54 +70,26 @@ def InstanceModifier(classToRunOn):
 
     ``InstanceModifier(foo).thatCarefullySets(c=2)`` returns modifier that sets ``foo`` instance attributes ``c`` to ``2`` if that instance already has ``c`` attribute and raises exception if it does not
     """
-    class ParticularClassModifier(Modifier):
+    def __init__(self, classToRunOn):
+        self.classToRunOn = classToRunOn
 
-        def shouldRun(self, instance=None, **kwargs):
-            return isinstance(instance, classToRunOn)
+    def thatDoes(self, action):
+        """
+        factory method that builds an instance backed by a given callable ``action``
+        """
+        return _ParticularClassModifier(self.classToRunOn, action)
 
-        def apply(self, instance=None, **kwargs):
-            if instance:
-                return self.do(instance)
+    def thatSets(self, **kwargs):
+        """
+        factory method that builds a modifier that sets given kwargs as attributes for the instance
+        """
+        return self.thatDoes(_setter(kwargs))
 
-        def do(self, instance):
-            """
-            this method should be extended by subclasses to override default action-consuming behavior
-            """
-            raise NotImplementedError('Do not use  ClassModifier on its own')
-
-        @classmethod
-        def thatDoes(self, action):
-            """
-            factory method that builds an instance backed by a given callable ``action``
-            """
-            class Impl(ParticularClassModifier):
-                def do(self, instance):
-                    return action(instance)
-
-            return Impl()
-
-        @classmethod
-        def thatSets(self, **kwargs):
-            """
-            factory method that builds a modifier that sets given kwargs as attributes for the instance
-            """
-            def setter(instance):
-                for (k, v) in kwargs.items():
-                    setattr(instance, k, v)
-            return self.thatDoes(setter)
-
-        @classmethod
-        def thatCarefullySets(self, **kwargs):
-            """
-            as `thatSets` factory method, but asserts that attribute exists
-            """
-            def setter(instance):
-                for (k, v) in kwargs.items():
-                    assert hasattr(instance, k), '<%s> is missing attribute <%s>' % (instance, k)
-                    setattr(instance, k, v)
-            return self.thatDoes(setter)
-
-    return ParticularClassModifier
+    def thatCarefullySets(self, **kwargs):
+        """
+        as `thatSets` factory method, but asserts that attribute exists
+        """
+        return self.thatDoes(_setter(kwargs, careful=True))
 
 
 def classvars(clazz):

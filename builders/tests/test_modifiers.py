@@ -1,5 +1,5 @@
 from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
-from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn,\
+from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn, \
     OneOf, Enabled, ValuesMixin, LambdaModifier
 from builders.builder import Builder
 import pytest
@@ -18,11 +18,12 @@ class C:
 
 
 def test_class_modifier_as_class():
-    class M(InstanceModifier(A)):
-        def apply(self, instance=None, **kwargs):
-            A.value = 5
+    def set_value(instance):
+        A.value = 5
 
-    a = Builder(A).withA(M()).build()
+    M = InstanceModifier(A).thatDoes(set_value)
+
+    a = Builder(A).withA(M).build()
 
     assert isinstance(a, A)
     assert a.value == 5
