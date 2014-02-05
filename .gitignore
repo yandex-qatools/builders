@@ -1,2 +1,8 @@
-/.project
-/.pydevproject
+#Eclipse files
+*.settings
+*.classpath
+*.project
+*.pydevproject
+*__pycache__
+*.pyc
+*.swp
