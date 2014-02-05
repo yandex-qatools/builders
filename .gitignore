@@ -2,7 +2,11 @@
 *.settings
 *.classpath
 *.project
+
+#pydev files
 *.pydevproject
 *__pycache__
+
+#python files
 *.pyc
 *.swp
