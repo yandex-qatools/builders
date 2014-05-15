@@ -26,8 +26,7 @@ def foo(a):
     pass
 
 
-@pytest.mark.parametrize('modifier', [
-                                      InstanceModifier(A).thatDoes(foo),
+@pytest.mark.parametrize('modifier', [InstanceModifier(A).thatDoes(foo),
                                       InstanceModifier(A).thatSets(a=2),
                                       InstanceModifier(A).thatCarefullySets(a=2),
                                       A.values(a=2),

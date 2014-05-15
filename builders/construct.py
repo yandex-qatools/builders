@@ -329,7 +329,7 @@ class Key(Construct):
 
     def doBuild(self, *args, **kwargs):
         cls = kwargs['instance'].__class__
-        if not cls in key_storage.keys():
+        if cls not in key_storage.keys():
             key_storage[cls] = []
 
         value = next(itertools.dropwhile(lambda x: x in key_storage[cls], self.value_generator(*args, **kwargs)))
