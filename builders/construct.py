@@ -127,12 +127,10 @@ class Collection(Unique):
         self.overrides.append(lambda x: amount)
 
     def build(self, *args, **kwargs):
-        self.onBuild(**kwargs)
-        if self.value:
-            logger.debug('%s has a set value %s' % (self, self.value))
-            # self.add(self.value)
-            self.value = None
         result = self.doBuild(*args, **kwargs)
+
+        if result and self.value:
+            self.onBuild(**kwargs)
         return result
 
     def onBuild(self, *args, **kwargs):
