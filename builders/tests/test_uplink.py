@@ -211,14 +211,14 @@ Down.up.linksTo(Up, Up.downs)
 def test_reuse():
     d1 = Builder(Down).withA(InstanceModifier(Up).thatSets(id=1)).build()
 
-    #assert d1 in d1.up.downs FIXME: this should work
+    # assert d1 in d1.up.downs FIXME: this should work
 
     d2 = Builder(Down).withA(InstanceModifier(Up).thatSets(id=1)).build()
     d3 = Builder(Down).withA(InstanceModifier(Up).thatSets(id=2)).build()
 
     assert d1.up == d2.up
-    #assert d1 in d2.up.downs FIXME: this should work
-    #assert d2 in d2.up.downs FIXME: this should work
+    # assert d1 in d2.up.downs FIXME: this should work
+    # assert d2 in d2.up.downs FIXME: this should work
     assert d1.up != d3.up
 
 
@@ -228,3 +228,18 @@ def test_reuse_regression():
     assert u1.downs[0].up == u1
     assert u1.downs[1].up == u1
     assert u1.downs[2].up == u1
+
+
+def test_uplink_reset():
+    class B:
+        a = Uplink()
+
+    class A:
+        bs = Collection(B)
+
+    B.a.linksTo(A, A.bs)
+
+    a = Builder(A).withA(NumberOf(A.bs, 0)).build()
+    b = Builder(B).build()
+
+    assert a != b.a
