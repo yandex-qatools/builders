@@ -2,6 +2,8 @@ from builders.construct import Unique, Uplink, Collection
 from builders.modifiers import NumberOf, Given, InstanceModifier, HavingIn
 from builders.builder import Builder
 import pytest
+from builders.logger import logger
+import logging
 
 
 class A:
@@ -271,6 +273,9 @@ def test_collection_mid_uplink_zaa():
     """
     Same as for ``aa``, but with different naming
     """
+
+    logger.setLevel(logging.DEBUG)
+
     class A:
         b = Uplink()
 
@@ -284,8 +289,10 @@ def test_collection_mid_uplink_zaa():
     B.c.linksTo(C, C.bb)
     A.b.linksTo(B, B.zaa)
 
-    c = Builder(B).withA(HavingIn(B.zaa, 1),
-                         HavingIn(C.bb, 1)).build().c
+    builder = Builder(B).withA(HavingIn(B.zaa, 1),
+                         HavingIn(C.bb, 1))
+
+    c = builder.build().c
 
     assert len(c.bb) == 2
     assert len(c.bb[0].zaa) == 2
