@@ -1,5 +1,5 @@
 from builders.construct import Unique, Uplink, Collection
-from builders.modifiers import NumberOf, Given, InstanceModifier
+from builders.modifiers import NumberOf, Given, InstanceModifier, HavingIn
 from builders.builder import Builder
 import pytest
 
@@ -243,3 +243,50 @@ def test_uplink_reset():
     b = Builder(B).build()
 
     assert a != b.a
+
+
+def test_collection_mid_uplink_aa():
+    class A:
+        b = Uplink()
+
+    class B:
+        aa = Collection(A)
+        c = Uplink()
+
+    class C:
+        bb = Collection(B)
+
+    B.c.linksTo(C, C.bb)
+    A.b.linksTo(B, B.aa)
+
+    c = Builder(B).withA(HavingIn(B.aa, 1),
+                         HavingIn(C.bb, 1)).build().c
+
+    assert len(c.bb) == 2
+    assert len(c.bb[0].aa) == 2
+    assert len(c.bb[1].aa) == 2
+
+
+def test_collection_mid_uplink_zaa():
+    """
+    Same as for ``aa``, but with different naming
+    """
+    class A:
+        b = Uplink()
+
+    class B:
+        zaa = Collection(A)
+        c = Uplink()
+
+    class C:
+        bb = Collection(B)
+
+    B.c.linksTo(C, C.bb)
+    A.b.linksTo(B, B.zaa)
+
+    c = Builder(B).withA(HavingIn(B.zaa, 1),
+                         HavingIn(C.bb, 1)).build().c
+
+    assert len(c.bb) == 2
+    assert len(c.bb[0].zaa) == 2
+    assert len(c.bb[1].zaa) == 2
