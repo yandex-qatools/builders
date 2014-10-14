@@ -24,7 +24,6 @@ class Modifier:
 
         Parameters are similar to the ``apply`` method
         """
-        return
 
     def __add__(self, other):
         """

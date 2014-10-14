@@ -1,0 +1,16 @@
+language: python
+python:
+- '2.7'
+install: pip install tox
+script: tox
+notifications:
+  email:
+  - pupssman@gmail.com
+deploy:
+  provider: pypi
+  user: pupssman
+  password:
+    secure: zoZ3sEpnFJA9pDPTGNozt2JDzsLfvm/baBvE/zpvoHokaTW7xLIawBt4CNlH0UXkkBuOke0VfvopXrIkrTsBj83VjFIjiF5goY8X4T+NwQKMrgI8uqSItjgGq+/wRDoruLkbZ9fBj6Mq57Woc5rCL9nIZCygjwZyeyLRUpyMx9U=
+  on:
+    tags: true
+    all_branches: true
