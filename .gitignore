@@ -10,3 +10,10 @@
 #python files
 *.pyc
 *.swp
+
+#build
+.coverage
+.tox/
+build/
+dist/
+builders.egg-info/
