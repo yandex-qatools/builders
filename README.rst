@@ -4,6 +4,9 @@ Builders
 
 Builders is a ligtweight test data generation framework made to ease the pain of working with complicated test data.
 
+.. image:: https://travis-ci.org/yandex-qatools/builders.svg?branch=master
+        :alt: Build Status
+        :target: https://travis-ci.org/yandex-qatools/builders/
 .. image:: https://readthedocs.org/projects/builders/badge/?version=latest
         :target: https://readthedocs.org/projects/builders/?badge=latest
         :alt: Documentation Status
