@@ -10,7 +10,7 @@ deploy:
   provider: pypi
   user: pupssman
   password:
-    secure: zoZ3sEpnFJA9pDPTGNozt2JDzsLfvm/baBvE/zpvoHokaTW7xLIawBt4CNlH0UXkkBuOke0VfvopXrIkrTsBj83VjFIjiF5goY8X4T+NwQKMrgI8uqSItjgGq+/wRDoruLkbZ9fBj6Mq57Woc5rCL9nIZCygjwZyeyLRUpyMx9U=
+    secure: Z1u/x+C58b//XdOcV/r5xzbho/QrbjLWz9LVVZIE2DVfSw8js4NIAiHZjkR2QlNaPZX3H6aM8D2ulfKBiCe45oOVoPjz4QENneOdAdBvWGr6E6t8NExj33j8hSSS4WuLtKbZtmkD8oX/6TrUcUtJALo+i9bKmAd1FP43xTj3zY4=
   on:
     tags: true
     all_branches: true
