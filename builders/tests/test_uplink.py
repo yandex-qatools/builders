@@ -290,7 +290,7 @@ def test_collection_mid_uplink_zaa():
     A.b.linksTo(B, B.zaa)
 
     builder = Builder(B).withA(HavingIn(B.zaa, 1),
-                         HavingIn(C.bb, 1))
+                               HavingIn(C.bb, 1))
 
     c = builder.build().c
 
