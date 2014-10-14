@@ -1,6 +1,7 @@
 import construct
 import collections
 
+from inspect import getmembers
 
 from builders.logger import logger
 
@@ -57,15 +58,17 @@ class Builder:
         instance = self.clazz()
         logger.debug('Created new instance %s of clazz %s' % (instance, self.clazz))
 
-        for a in dir(instance):
-            attr = getattr(instance, a)
-            if isinstance(attr, construct.Construct):
-                logger.debug('Constructing <%s.%s>' % (self.clazz, a))
-                setattr(instance, a, attr.build(self.modifiers, instance=instance))
-            elif type(attr) == type and not a.startswith('__'):
-                setattr(instance, a, attr())
-            else:
-                logger.debug('<%s.%s> is not a <%s> but a <%s>' % (self.clazz, a, construct.Construct, attr))
+        def make_construct(name, construct):
+            logger.debug('Constructing <%s.%s>' % (self.clazz, name))
+            setattr(instance, name, construct.build(self.modifiers, instance=instance))
+
+        logger.debug('Creating nested constructst of %s' % instance)
+        for name, value in getmembers(instance, lambda x: isinstance(x, construct.Construct) and not isinstance(x, construct.Uplink)):
+            make_construct(name, value)
+
+        logger.debug('Creating uplinks of %s' % instance)
+        for name, value in getmembers(instance, lambda x: isinstance(x, construct.Uplink)):
+            make_construct(name, value)
 
         # instance level modifier application
         for modifier in self.modifiers:
