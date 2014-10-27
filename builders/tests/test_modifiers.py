@@ -1,8 +1,9 @@
+import pytest
+
+from builders.builder import Builder
 from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
 from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn, \
-    OneOf, Enabled, ValuesMixin, LambdaModifier
-from builders.builder import Builder
-import pytest
+    OneOf, Enabled, ValuesMixin, LambdaModifier, Another
 
 
 class A:
@@ -241,3 +242,23 @@ class Foo(ValuesMixin):
 def test_values_mixin(monkeypatch):
     assert Builder(Foo).withA(Foo.values(bar=1)).build().bar == 1
     assert Builder(Foo).withA(Foo.values(baz='baz')).build().baz == 'baz'
+
+
+def test_another_modifier():
+    class A:
+        a = 0
+        b = Uplink()
+
+    class B:
+        values = Collection(A)
+
+    A.b.linksTo(B, B.values)
+
+    b = Builder(B).withA(NumberOf(B.values, 1)).\
+        withA(Another(B.values, InstanceModifier(A).thatSets(a=4))).\
+        withA(Another(B.values, InstanceModifier(A).thatSets(a=28))).build()
+
+    assert len(b.values) == 3
+    assert len([a for a in b.values if a.a == 0]) == 1
+    assert len([a for a in b.values if a.a == 4]) == 1
+    assert len([a for a in b.values if a.a == 28]) == 1
