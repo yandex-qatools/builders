@@ -242,8 +242,8 @@ class ValuesMixin:
         return InstanceModifier(clz).thatCarefullySets(**kw)
 
 
-def Another(collection, mod):
+def Another(collection, *modifiers):
     """
     Add another instance to given ``collection`` with given ``mod``
     """
-    return [HavingIn(collection, 1), OneOf(collection, mod)]
+    return [HavingIn(collection, 1), OneOf(collection, *modifiers)]
