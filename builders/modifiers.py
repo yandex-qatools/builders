@@ -240,3 +240,10 @@ class ValuesMixin:
     @classmethod
     def values(clz, **kw):
         return InstanceModifier(clz).thatCarefullySets(**kw)
+
+
+def Another(collection, *modifiers):
+    """
+    Add another instance to given ``collection`` with given ``mod``
+    """
+    return [HavingIn(collection, 1), OneOf(collection, *modifiers)]
