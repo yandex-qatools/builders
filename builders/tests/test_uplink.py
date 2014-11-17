@@ -315,19 +315,24 @@ L2.d.linksTo(D2, D2.l)
 R2.d.linksTo(D2, D2.r)
 
 
-def test_double_incoming_uplinks():
+@pytest.fixture(scope='function')
+def clear_state():
+    Reused._Reused__reused_instances.clear()  # XXX: note the name mangling @UndefinedVariable
+
+
+def test_double_incoming_uplinks(clear_state):
     d = Builder(D2).build()
     assert d.l.d == d
     assert d.r.d == d
 
 
-def test_double_incoming_uplinks_left_branch():
+def test_double_incoming_uplinks_left_branch(clear_state):
     r = Builder(R2).build()
     assert r.d.r.d == r.d
     assert r.d.l.d == r.d
 
 
-def test_double_incoming_uplinks_right_branch():
+def test_double_incoming_uplinks_right_branch(clear_state):
     l = Builder(R2).build()
     assert l.d.l.d == l.d
     assert l.d.r.d == l.d
