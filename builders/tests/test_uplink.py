@@ -1,4 +1,4 @@
-from builders.construct import Unique, Uplink, Collection
+from builders.construct import Unique, Uplink, Collection, Reused
 from builders.modifiers import NumberOf, Given, InstanceModifier, HavingIn
 from builders.builder import Builder
 import pytest
@@ -297,3 +297,37 @@ def test_collection_mid_uplink_zaa():
     assert len(c.bb) == 2
     assert len(c.bb[0].zaa) == 2
     assert len(c.bb[1].zaa) == 2
+
+
+class L2:
+    d = Uplink()
+
+
+class R2:
+    d = Uplink()
+
+
+class D2:
+    l = Reused(L2)
+    r = Reused(R2)
+
+L2.d.linksTo(D2, D2.l)
+R2.d.linksTo(D2, D2.r)
+
+
+def test_double_incoming_uplinks():
+    d = Builder(D2).build()
+    assert d.l.d == d
+    assert d.r.d == d
+
+
+def test_double_incoming_uplinks_left_branch():
+    r = Builder(R2).build()
+    assert r.d.r.d == r.d
+    assert r.d.l.d == r.d
+
+
+def test_double_incoming_uplinks_right_branch():
+    l = Builder(R2).build()
+    assert l.d.l.d == l.d
+    assert l.d.r.d == l.d
