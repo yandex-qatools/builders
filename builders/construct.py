@@ -206,7 +206,7 @@ class Reused(Unique):
         key = tuple([self.type] + [getattr(candidate, k) for k in self.key_components])
 
         if not self.instances.get(key):
-            self.instances[key] = Unique.doBuild(self, modifiers)
+            self.instances[key] = candidate
         return self.instances[key]
 
 
