@@ -2,7 +2,7 @@ import construct
 from builders.logger import logger
 
 
-__all__ = ['Modifier', 'InstanceModifier', 'ValuesMixin', 'ClazzModifier', 'ConstructModifier', 'Given', 'NumberOf', 'HavingIn', 'OneOf', 'Enabled', 'LambdaModifier', 'Another']
+__all__ = ['Modifier', 'InstanceModifier', 'ValuesMixin', 'ClazzModifier', 'ConstructModifier', 'Given', 'NumberOf', 'HavingIn', 'OneOf', 'Enabled', 'Disabled', 'LambdaModifier', 'Another']
 
 
 class Modifier(object):
@@ -198,7 +198,7 @@ class OneOf(ConstructModifier):
 
 class Enabled(ConstructModifier):
     """
-    Turns on given :py:class:`builders.construct.Maybe`
+    Turns on given :py:class:`builders.construct.Maybe` once.
     """
     def __init__(self, what):
         assert isinstance(what, construct.Maybe)
@@ -207,6 +207,14 @@ class Enabled(ConstructModifier):
 
     def doApply(self, construct):
         construct.enabled = True
+
+
+class Disabled(Enabled):
+    """
+    Like :py:class:`Enabled`, but the other way around.
+    """
+    def doApply(self, construct):
+        construct.enabled = False
 
 
 class LambdaModifier(ConstructModifier):

@@ -3,7 +3,7 @@ import pytest
 from builders.builder import Builder
 from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
 from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn, \
-    OneOf, Enabled, ValuesMixin, LambdaModifier, Another
+    OneOf, Enabled, ValuesMixin, LambdaModifier, Another, Disabled
 
 
 class A:
@@ -262,3 +262,31 @@ def test_another_modifier():
     assert len([a for a in b.values if a.a == 0]) == 1
     assert len([a for a in b.values if a.a == 4]) == 1
     assert len([a for a in b.values if a.a == 28]) == 1
+
+
+def test_maybe_default():
+    class A:
+        pass
+
+    class B:
+        a = Maybe(Unique(A), enabled=True)
+
+    b1 = Builder(B).build()
+    b2 = Builder(B).build()
+
+    assert b1.a
+    assert b2.a
+
+
+def test_maybe_disabled():
+    class A:
+        pass
+
+    class B:
+        a = Maybe(Unique(A), enabled=True)
+
+    b1 = Builder(B).withA(Disabled(B.a)).build()
+    b2 = Builder(B).build()
+
+    assert b1.a is None
+    assert b2.a
