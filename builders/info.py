@@ -6,5 +6,5 @@ Created on Mar 6, 2013
 @author: pupssman
 '''
 
-__version__ = '1.2.4'
+__version__ = '1.2.5'
 __package_name__ = 'builders'

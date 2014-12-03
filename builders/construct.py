@@ -12,7 +12,7 @@ from builders.logger import logger
 __all__ = ['Construct', 'Predefined', 'Unique', 'Collection', 'Reused', 'Random', 'Maybe', 'Uplink', 'Uid', 'Key', 'Lambda']
 
 
-class Link:
+class Link(object):
     """
     Connects this :py:class:`Construct` to another. Used mainly with :py:class:`Uplink`.
     """

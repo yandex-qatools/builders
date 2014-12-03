@@ -5,7 +5,7 @@ from builders.logger import logger
 __all__ = ['Modifier', 'InstanceModifier', 'ValuesMixin', 'ClazzModifier', 'ConstructModifier', 'Given', 'NumberOf', 'HavingIn', 'OneOf', 'Enabled', 'LambdaModifier', 'Another']
 
 
-class Modifier:
+class Modifier(object):
     """
     Base class for build process modifiers.
     Child classes should implement ``apply`` method.
@@ -224,7 +224,7 @@ class LambdaModifier(ConstructModifier):
             raise TypeError("This modifier is applicable only for Lambda construct and it's children, but instead got %s" % type(lambda_construct))
 
 
-class ValuesMixin:
+class ValuesMixin(object):
     """
         Syntactic sugar for ``InstanceModifier.thatCarefullySets``. Use it like::
 
