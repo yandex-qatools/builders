@@ -225,9 +225,11 @@ class Maybe(Construct):
         self.default = enabled
 
     def doBuild(self, *args, **kwargs):
-        if self.enabled:
-            return self.construct.doBuild(*args, **kwargs)
-        self.enabled = self.default
+        try:
+            if self.enabled:
+                return self.construct.doBuild(*args, **kwargs)
+        finally:
+            self.enabled = self.default
 
 
 class Uplink(Construct):

@@ -290,3 +290,17 @@ def test_maybe_disabled():
 
     assert b1.a is None
     assert b2.a
+
+
+def test_maybe_enabled():
+    class A:
+        pass
+
+    class B:
+        a = Maybe(Unique(A))
+
+    b1 = Builder(B).withA(Enabled(B.a)).build()
+    b2 = Builder(B).build()
+
+    assert b1.a is not None
+    assert b2.a is None
