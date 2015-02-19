@@ -7,12 +7,13 @@ Created on Apr 12, 2013
 '''
 from builders.builder import Builder
 from builders.construct import Random, Uid, Key, Lambda
+from builders.model_graph import BuilderModelClass
 import pytest
 
 
 @pytest.mark.parametrize('run', range(100))
 def test_random_number(run):
-    class A:
+    class A(BuilderModelClass):
         a = Random(1, 10)
 
     value = Builder(A).build()
@@ -23,7 +24,7 @@ def test_random_number(run):
 
 @pytest.mark.parametrize('run', range(100))
 def test_random_string(run):
-    class A:
+    class A(BuilderModelClass):
         a = Random(1, 10, 'foo_%s')
 
     value = Builder(A).build().a
@@ -34,7 +35,7 @@ def test_random_string(run):
 
 
 def test_uid_gives_valid_uid():
-    class A:
+    class A(BuilderModelClass):
         a = Uid()
 
     value = Builder(A).build().a
@@ -44,7 +45,7 @@ def test_uid_gives_valid_uid():
 
 
 def test_uid_is_random():
-    class A:
+    class A(BuilderModelClass):
         a = Uid()
 
     values = [Builder(A).build().a for _ in xrange(100)]
@@ -53,7 +54,7 @@ def test_uid_is_random():
 
 
 def test_key_is_unique():
-    class A:
+    class A(BuilderModelClass):
         a = Key(Random(start=1, end=100))
 
     values = [Builder(A).build().a for _ in xrange(100)]
@@ -65,7 +66,7 @@ def test_lambda_executed_twice():
     from itertools import count
     gen = count()
 
-    class A:
+    class A(BuilderModelClass):
         a = Lambda(lambda _: gen.next())
 
     values = [Builder(A).build().a for _ in xrange(2)]
@@ -77,7 +78,7 @@ def test_class_passed_to_lambda():
     def check_instance_passed(instance):
         assert isinstance(instance, A)
 
-    class A:
+    class A(BuilderModelClass):
         a = Lambda(check_instance_passed)
 
     Builder(A).build()

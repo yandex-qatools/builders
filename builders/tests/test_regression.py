@@ -1,28 +1,29 @@
 'This test implements a typical object set to have some regeression tests'
-from builders.construct import Uplink, Collection, Unique
 from builders.builder import Builder
+from builders.construct import Uplink, Collection, Unique
+from builders.model_graph import BuilderModelClass
 from builders.modifiers import NumberOf, Given
 
 
-class Unit:
+class Unit(BuilderModelClass):
     name = ''
     type = ''
     squad = Uplink()
 
 
-class Hero(object):
+class Hero(BuilderModelClass):
     epic_name = ''
     squad = Uplink()
 
 
-class Squad(object):
+class Squad(BuilderModelClass):
     name = ''
     units = Collection(Unit)
     leader = Unique(Hero)
     player = Uplink()
 
 
-class Player(object):
+class Player(BuilderModelClass):
     name = ''
     squads = Collection(Squad)
 

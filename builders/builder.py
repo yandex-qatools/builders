@@ -26,13 +26,11 @@ def flatten(l):
 
 class Builder:
     def __init__(self, clazzToBuild):
-        import model_graph
-        self.class_graph = model_graph.m_graph.copy()
+        self.class_graph = None
         self.clazz = clazzToBuild
         self.modifiers = []
-        self.class_graph = None
         self.obj_graph = None
-        
+        self.result_object = None
 
     def _buildclazz(self, clazzToBuild, do_finalize=True):
         self._build_default_obj_graph()
@@ -40,15 +38,23 @@ class Builder:
         if do_finalize:
             self._finalize_objects_structure()
         self._apply_instance_modifiers()
-        return self.obj_graph.node[(clazzToBuild, 0)]["instance"]
+        return self.result_object
 
     def _build_default_obj_graph(self):
-        mapping = {clazz: (clazz, 0) for clazz in self.class_graph.nodes()}
-        print mapping
-        self.obj_graph = nx.relabel_nodes(self.class_graph, mapping, copy = True)
-        print self.obj_graph.nodes(data=True)
-        for node in self.obj_graph.nodes():
-            self.obj_graph.node[node]["instance"] = node[0]()
+        import model_graph
+        import model_graph as graph_utils
+        self.class_graph = graph_utils.nondeepcopy_graph(model_graph.m_graph)
+        
+        mapping = {clazz: clazz() for clazz in self.class_graph.nodes()}
+        self.obj_graph = graph_utils.nondeepcopy_graph(self.class_graph)
+        self.obj_graph = nx.relabel_nodes(self.obj_graph, mapping)
+        self.result_object = mapping[self.clazz]
+
+        self.obj_graph.add_nodes_from(self.class_graph.nodes(data=True))
+        #self.obj_graph.add_edges_from(self.class_graph.edges(data=True))
+        for clazz, instance in mapping.items():
+            self.obj_graph.add_edge(clazz, instance)
+            self.obj_graph.add_edge(instance, clazz)
         return self.obj_graph
 
     def _apply_graph_modifiers(self):
@@ -62,14 +68,25 @@ class Builder:
     def _finalize_objects_structure(self):
         #import model_graph
         #self.class_graph = model_graph.m_graph.ou
-        for node, node_data in self.obj_graph.nodes(data=True):
-            for _, to_node, link_data in self.obj_graph.out_edges([node], data=True):
+        for instance in self.obj_graph.nodes():
+            if instance in self.class_graph.nodes():
+                continue
+            for _, to_instance, link_data in self.obj_graph.out_edges([instance], data=True):
+                if to_instance in self.class_graph.nodes():
+                    continue
                 if link_data["rel_type"] == Many:
-                    if not isinstance(getattr(node_data["instance"], link_data["local_attr"]), list):
-                        setattr(node_data["instance"], link_data["local_attr"], [])
-                    getattr(node_data["instance"], link_data["local_attr"]).append(self.obj_graph.node[to_node]["instance"])
+                    if not isinstance(getattr(instance, link_data["local_attr"]), list):
+                        setattr(instance, link_data["local_attr"], [])
+                    getattr(instance, link_data["local_attr"]).append(to_instance)
                 elif link_data["rel_type"] == One:
-                    setattr(node_data["instance"], link_data["local_attr"], self.obj_graph.node[to_node]["instance"])
+                    setattr(instance, link_data["local_attr"], to_instance)
+            
+            def make_construct(name, construct):
+                setattr(instance, name, construct.build([], instance=instance))
+
+            for name, value in getmembers(instance, lambda x: isinstance(x, construct.Random) or isinstance(x, construct.Uid) or isinstance(x, construct.Key)):
+                make_construct(name, value)
+
 
     def build(self, with_graph=False, do_finalize=True):
         if with_graph:

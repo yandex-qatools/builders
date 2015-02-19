@@ -1,18 +1,19 @@
 from builders.builder import Builder, flatten
 from builders.construct import Unique, Collection, Reused
+from builders.model_graph import BuilderModelClass
 from builders.modifiers import InstanceModifier
 
 
-class A:
+class A(BuilderModelClass):
     b = 0
 
 
-class B:
+class B(BuilderModelClass):
     a = Unique(A)
     value = 0
 
 
-class C:
+class C(BuilderModelClass):
     b = Unique(B)
 
 
@@ -39,7 +40,7 @@ def test_simple_setter():
     assert built.value == 1
 
 
-class D:
+class D(BuilderModelClass):
     bs = Collection(B)
 
 
@@ -59,12 +60,12 @@ def test_modifier_over_collection():
         assert b.value == 8
 
 
-class U:
+class U(BuilderModelClass):
     a = Reused(A, local=True)
     b = Reused(A, local=True)
 
 
-class V:
+class V(BuilderModelClass):
     u = Unique(U)
 
 
@@ -86,7 +87,7 @@ def test_local_reused_again():
     assert v1.u.a == v2.u.a
 
 
-class R:
+class R(BuilderModelClass):
     a = Reused(A)
     b = Reused(A)
 
@@ -99,7 +100,7 @@ def test_global_reused():
     assert r.a == r.b
 
 
-class ReusingKey:
+class ReusingKey(BuilderModelClass):
     a = Reused(A, keys=['b'])
     b = Reused(A, keys=['b'])
 
@@ -127,10 +128,10 @@ def test_reused_keys_mod():
 
 
 def test_simple_inheritance():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Unique(A)
 
     class C(B):
@@ -142,11 +143,11 @@ def test_simple_inheritance():
 
 
 def test_modifier_supply():
-    class A:
+    class A(BuilderModelClass):
         foo = 0
         bar = 0
 
-    class B:
+    class B(BuilderModelClass):
         a = Unique(A)
 
     mod1 = InstanceModifier(A).thatSets(foo=1)
@@ -183,10 +184,10 @@ def test_flatten_callable():
 
 
 def test_new_style_classes():
-    class A(object):
+    class A(BuilderModelClass):
         pass
 
-    class B(object):
+    class B(BuilderModelClass):
         a_s = Collection(A)
 
     b = Builder(B).build()

@@ -1,17 +1,18 @@
-from builders.construct import Unique, Uplink, Collection, Reused
-from builders.modifiers import NumberOf, Given, InstanceModifier, HavingIn
 from builders.builder import Builder
-import pytest
+from builders.construct import Unique, Uplink, Collection, Reused
 from builders.logger import logger
+from builders.model_graph import BuilderModelClass
+from builders.modifiers import NumberOf, Given, InstanceModifier, HavingIn
 import logging
+import pytest
 
 
-class A:
+class A(BuilderModelClass):
     value = 'OK'
     b = Uplink()
 
 
-class B:
+class B(BuilderModelClass):
     a = Unique(A)
 
 
@@ -42,25 +43,25 @@ def test_reverse():
 
 
 def test_unlinked():
-    class F:
+    class F(BuilderModelClass):
         value = Uplink()
 
     with pytest.raises(ValueError):
         Builder(F).build()
 
 
-class X:
+class X(BuilderModelClass):
     y = Uplink()
 
 
-class Y:
+class Y(BuilderModelClass):
     x = Unique(X)
     z = Uplink()
 
 X.y.linksTo(Y, Y.x)
 
 
-class Z:
+class Z(BuilderModelClass):
     y = Unique(Y)
 
 
@@ -101,16 +102,16 @@ def test_long_chain_reverse():
     assert not Z.y.value
 
 
-class D:
+class D(BuilderModelClass):
     l = Uplink()
     r = Uplink()
 
 
-class L:
+class L(BuilderModelClass):
     d = Unique(D)
 
 
-class R:
+class R(BuilderModelClass):
     d = Unique(D)
 
 
@@ -149,12 +150,12 @@ def test_Given():
     assert b.a == 8
 
 
-class Small:
+class Small(BuilderModelClass):
     value = 'Okay'
     big = Uplink()
 
 
-class Big:
+class Big(BuilderModelClass):
     smalls = Collection(Small)
 
 Small.big.linksTo(Big, Big.smalls)
@@ -199,11 +200,11 @@ def test_collection_from_bottom(number):
         assert s.big == small.big
 
 
-class Down:
+class Down(BuilderModelClass):
     up = Uplink(reusing_by=['id'])
 
 
-class Up:
+class Up(BuilderModelClass):
     id = 0
     downs = Collection(Down)
 
@@ -233,10 +234,10 @@ def test_reuse_regression():
 
 
 def test_uplink_reset():
-    class B:
+    class B(BuilderModelClass):
         a = Uplink()
 
-    class A:
+    class A(BuilderModelClass):
         bs = Collection(B)
 
     B.a.linksTo(A, A.bs)
@@ -248,14 +249,14 @@ def test_uplink_reset():
 
 
 def test_collection_mid_uplink_aa():
-    class A:
+    class A(BuilderModelClass):
         b = Uplink()
 
-    class B:
+    class B(BuilderModelClass):
         aa = Collection(A)
         c = Uplink()
 
-    class C:
+    class C(BuilderModelClass):
         bb = Collection(B)
 
     B.c.linksTo(C, C.bb)
@@ -276,14 +277,14 @@ def test_collection_mid_uplink_zaa():
 
     logger.setLevel(logging.DEBUG)
 
-    class A:
+    class A(BuilderModelClass):
         b = Uplink()
 
-    class B:
+    class B(BuilderModelClass):
         zaa = Collection(A)
         c = Uplink()
 
-    class C:
+    class C(BuilderModelClass):
         bb = Collection(B)
 
     B.c.linksTo(C, C.bb)
@@ -299,15 +300,15 @@ def test_collection_mid_uplink_zaa():
     assert len(c.bb[1].zaa) == 2
 
 
-class L2:
+class L2(BuilderModelClass):
     d = Uplink()
 
 
-class R2:
+class R2(BuilderModelClass):
     d = Uplink()
 
 
-class D2:
+class D2(BuilderModelClass):
     l = Reused(L2)
     r = Reused(R2)
 

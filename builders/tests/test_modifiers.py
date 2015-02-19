@@ -1,5 +1,6 @@
 from builders.builder import Builder
 from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
+from builders.model_graph import BuilderModelClass
 from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn, \
     OneOf, Enabled, ValuesMixin, LambdaModifier, Another, Disabled, Group, Same
 from random import randint
@@ -7,15 +8,15 @@ import pytest
 
 
 
-class A:
+class A(BuilderModelClass):
     value = 1
 
 
-class B:
+class B(BuilderModelClass):
     a = Unique(A)
 
 
-class C:
+class C(BuilderModelClass):
         b = Unique(B)
 
 
@@ -66,10 +67,10 @@ def test_given_chains():
 
 
 def test_not_touches():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Unique(A)
 
     b1 = Builder(B).withA(Given(B.a, 8)).build()
@@ -81,10 +82,10 @@ def test_not_touches():
 
 
 def test_modifies_dont_affect_given():
-    class A:
+    class A(BuilderModelClass):
         value = 0
 
-    class B:
+    class B(BuilderModelClass):
         a = Unique(A)
 
     myA = A()
@@ -97,10 +98,10 @@ def test_modifies_dont_affect_given():
 
 
 def test_having():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Collection(A)
 
     def check(b, num):
@@ -122,10 +123,10 @@ def test_having():
 
 
 def test_Having_instances():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Collection(A)
 
     myA = A()
@@ -139,7 +140,7 @@ def test_Having_instances():
 
 
 def test_thatSets():
-    class A:
+    class A(BuilderModelClass):
         pass
 
     a = Builder(A).withA(InstanceModifier(A).thatSets(ololo=1, hahaha=2)).build()
@@ -148,11 +149,11 @@ def test_thatSets():
 
 
 def test_one_of():
-    class A:
+    class A(BuilderModelClass):
         a = 0
         b = Uplink()
 
-    class B:
+    class B(BuilderModelClass):
         values = Collection(A)
 
     A.b.linksTo(B, B.values)
@@ -168,10 +169,10 @@ def test_one_of():
 
 
 def test_maybe():
-    class A:
+    class A(BuilderModelClass):
         b = Uplink()
 
-    class B:
+    class B(BuilderModelClass):
         a = Maybe(Unique(A))
 
     A.b.linksTo(B, B.a)
@@ -186,7 +187,7 @@ def test_maybe():
     assert a.b.a == a
 
 
-class CarefulA:
+class CarefulA(BuilderModelClass):
     ololo = 0
     hahaha = 0
 
@@ -213,14 +214,14 @@ def test_sum():
 
 
 def test_lambda_modifier_changes_function():
-    class A:
+    class A(BuilderModelClass):
         a = Lambda(lambda _: 1)
 
     assert Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build().a == 2
 
 
 def test_lambda_modifier_function_is_set_back():
-    class A:
+    class A(BuilderModelClass):
         a = Lambda(lambda _: 1)
 
     Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build()
@@ -228,14 +229,14 @@ def test_lambda_modifier_function_is_set_back():
 
 
 def test_lambda_modifier_raises_given_not_lambda():
-    class A:
+    class A(BuilderModelClass):
         a = Random()
 
     with pytest.raises(TypeError):
         Builder(A).withA(LambdaModifier(A.a, lambda _: 2)).build()
 
 
-class Foo(ValuesMixin):
+class Foo(ValuesMixin, BuilderModelClass):
         bar = 0
         baz = ''
 
@@ -246,11 +247,11 @@ def test_values_mixin(monkeypatch):
 
 
 def test_another_modifier():
-    class A:
+    class A(BuilderModelClass):
         a = 0
         b = Uplink()
 
-    class B:
+    class B(BuilderModelClass):
         values = Collection(A)
 
     A.b.linksTo(B, B.values)
@@ -266,10 +267,10 @@ def test_another_modifier():
 
 
 def test_maybe_default():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Maybe(Unique(A), enabled=True)
 
     b1 = Builder(B).build()
@@ -280,10 +281,10 @@ def test_maybe_default():
 
 
 def test_maybe_disabled():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Maybe(Unique(A), enabled=True)
 
     b1 = Builder(B).withA(Disabled(B.a)).build()
@@ -294,10 +295,10 @@ def test_maybe_disabled():
 
 
 def test_maybe_enabled():
-    class A:
+    class A(BuilderModelClass):
         pass
 
-    class B:
+    class B(BuilderModelClass):
         a = Maybe(Unique(A))
 
     b1 = Builder(B).withA(Enabled(B.a)).build()
@@ -307,17 +308,17 @@ def test_maybe_enabled():
     assert b2.a is None
 
 
-class A1:
+class A1(BuilderModelClass):
     b = Uplink()
     c = Uplink()
     id = Random()
 
 
-class B1:
+class B1(BuilderModelClass):
     a = Collection(A1, number=0)
 
 
-class C1:
+class C1(BuilderModelClass):
     a = Collection(A1, number=0)
 
 

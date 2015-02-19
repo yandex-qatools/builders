@@ -5,18 +5,19 @@ Created on Jan 17, 2014
 
 @author: pupssman
 '''
-import pickle
-import pytest
+from builders.construct import Collection, Unique, Maybe
+from builders.model_graph import BuilderModelClass
 from builders.modifiers import InstanceModifier, NumberOf, ValuesMixin, Given, \
     HavingIn, Enabled, OneOf
-from builders.construct import Collection, Unique, Maybe
+import pickle
+import pytest
 
 
-class A(ValuesMixin):
+class A(ValuesMixin, BuilderModelClass):
     a = 1
 
 
-class B:
+class B(BuilderModelClass):
     a = Unique(A)
     ma = Maybe(Unique(A))
     aa = Collection(A)

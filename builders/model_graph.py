@@ -18,12 +18,30 @@ relation_types = {
                   }
 
 
-def count_out_links_by_local_attr(obj_graph, node, attr):
-    i = 0
-    for from_n, to_n, k, data in m_graph.out_edges([node], keys=True, data=True):
-        if data["local_attr"] == attr:
-            i+=1
-    return i
+def nondeepcopy_graph(graph):
+    new_g = nx.MultiDiGraph()
+    new_g.add_nodes_from(graph.nodes(data=True))
+    new_g.add_edges_from(graph.edges(data=True))
+    return new_g
+
+
+def get_out_edges_by_(obj_graph, node=None, link_attr="construct", value=None):
+    edges = []
+    nodes = [node] if node is not None else None
+    for out_edge in obj_graph.out_edges(nodes, keys=True, data=True):
+        data = out_edge[-1]
+        if data and link_attr in data.keys() and data[link_attr] == value:
+            edges.append(out_edge)
+    return edges
+
+
+def link_instance_nodes(obj_graph, n1, n2):
+    edges = m_graph.edges([n1.__class__, n2.__class__], data=True)
+    for from_n, to_n, data in edges:
+        if (from_n == n1.__class__ and to_n == n2.__class__):
+            obj_graph.add_edge(n1, n2, attr_dict=data)
+        elif (from_n == n2.__class__ and to_n == n1.__class__):
+            obj_graph.add_edge(n2, n1, attr_dict=data)
 
 
 #Builder Model Class metaclass
@@ -46,12 +64,14 @@ class BMCMeta(type):
                     if isinstance(remote_value, construct.Uplink):
                         dest = remote_value.getLinkDestination()
                         if dest is not None and dest["cls"] == clsname and dest["attr"] == attr:
-                            m_graph.add_edge(value.type, bmo, attr_dict={"rel_type": relation_types[remote_value.__class__],
+                            m_graph.add_edge(value.type, bmo, attr_dict={"construct": remote_value,
+                                                                         "rel_type": relation_types[remote_value.__class__],
                                                                          "local_attr": remote_attr,
                                                                          "remote_attr": attr})
                             remote_attr_found = remote_attr
                             break
-                m_graph.add_edge(bmo, value.type, attr_dict={"rel_type": relation_types[value.__class__],
+                m_graph.add_edge(bmo, value.type, attr_dict={"construct": value,
+                                                             "rel_type": relation_types[value.__class__],
                                                              "local_attr": attr,
                                                              "remote_attr": remote_attr_found})
 

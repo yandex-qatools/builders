@@ -16,6 +16,7 @@ class Link(object):
     """
     Connects this :py:class:`Construct` to another. Used mainly with :py:class:`Uplink`.
     """
+    clazz = None
     destination = None
     value = None
 
@@ -343,18 +344,21 @@ class Uplink(Construct):
     """
 
     def __init__(self, reusing_by=[], links_to=None):
-        if links_to is not None:
-            self.links_to = links_to
+        self.links_to = links_to
         if reusing_by:
             self.reuser = Reused(None, local=True, keys=reusing_by)
         else:
             self.reuser = None
 
     def getLinkDestination(self):
-        if self.links_to is None:
-            return None
-        res = self.links_to.split(".", 1)
-        return {"cls": res[0], "attr": res[1]}
+        if self.clazz and self.destination:
+            for k, v in self.clazz.__dict__.items():
+                if v == self.destination:
+                    return {"cls": self.clazz.__name__, "attr": k}
+        if self.links_to is not None:
+            res = self.links_to.split(".", 1)
+            return {"cls": res[0], "attr": res[1]}
+        return None
 
     def doBuild(self, modifiers, instance=None, **kwargs):
         if not self.destination:
@@ -379,6 +383,19 @@ class Uplink(Construct):
         if self.reuser:
             self.reuser.type = clazz
         self.setDestination(clazz, destination)
+
+        import model_graph as mg
+        dest = self.getLinkDestination()
+        edge = mg.get_out_edges_by_(mg.m_graph, node=self.clazz, link_attr="local_attr", value=dest['attr'])[0]
+        local_attr = None
+        for k, v in edge[1].__dict__.items():
+            if v == self:
+                local_attr = k
+        mg.m_graph.edge[edge[0]][edge[1]][0]["remote_attr"] = local_attr
+        mg.m_graph.add_edge(edge[1], edge[0], attr_dict={"construct": self,
+                                                         "rel_type": mg.relation_types[Uplink],
+                                                         "local_attr": local_attr,
+                                                         "remote_attr": dest['attr']})
 
 
 class Random(Construct):

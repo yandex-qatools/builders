@@ -1,4 +1,3 @@
-import construct as construct_package
 from builders.logger import logger
 import construct
 import model_graph as graph_utils
@@ -68,12 +67,21 @@ class NumberOf(ModelStructureModifier):
         self.value = amount
 
     def do(self, obj_graph):
-        self.what.number = self.amount
-        self.
-        graph_utils.count_out_links_by_local_attr(obj_graph, node, attr)
+        from model_graph import m_graph
+        from builder import Builder
+        container_class = graph_utils.get_out_edges_by_(m_graph, link_attr="construct", value=self.what)[0][0]
+        for instance in obj_graph.successors(container_class):
+            child_links = graph_utils.get_out_edges_by_(obj_graph, instance, link_attr="construct", value=self.what)
+            while len(child_links) < self.value:
+                (new_child, child_graph) = Builder(self.what.type).build(with_graph=True, do_finalize=False)
+                child_graph.remove_nodes_from(child_graph.successors(container_class))
+                obj_graph.add_nodes_from(child_graph.nodes(data=True))
+                obj_graph.add_edges_from(child_graph.edges(data=True))
+                graph_utils.link_instance_nodes(obj_graph, instance, new_child)
+                child_links.append(new_child)
 
 
-'''
+
 class _ParticularClassModifier(Modifier):
     def __init__(self, classToRunOn, action):
         self.classToRunOn = classToRunOn
@@ -187,7 +195,7 @@ class Given(ConstructModifier):
     def doApply(self, construct):
         construct.value = self.value
 
-
+'''
 class NumberOf(ConstructModifier):
     """
     Sets the target number of :py:class:`builders.constructs.Collection` elements to a given ``amount``
@@ -201,7 +209,7 @@ class NumberOf(ConstructModifier):
 
     def doApply(self, construct):
         construct.set(self.value)
-
+'''
 
 class HavingIn(ConstructModifier):
     """
@@ -361,13 +369,10 @@ class Same(GroupRule):
         if self.saved_instance is None:
             return
         class_field_value = getattr(self.saved_instance.__class__, self.field)
-        if isinstance(class_field_value, construct_package.Uplink) and isinstance(class_field_value.destination, construct_package.Collection):
+        if isinstance(class_field_value, construct.Uplink) and isinstance(class_field_value.destination, construct.Collection):
             for field, value in class_field_value.clazz.__dict__.items():
                 if value == class_field_value.destination:
                     getattr(getattr(self.saved_instance, self.field), field).append(instance)
 
     def hasNextModifier(self, instance=None):
         return self.saved_instance is not None or instance is not None
-'''
-
-
