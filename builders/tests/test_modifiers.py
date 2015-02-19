@@ -1,9 +1,10 @@
-import pytest
-
 from builders.builder import Builder
 from builders.construct import Unique, Collection, Uplink, Maybe, Lambda, Random
 from builders.modifiers import Given, InstanceModifier, NumberOf, HavingIn, \
-    OneOf, Enabled, ValuesMixin, LambdaModifier, Another, Disabled
+    OneOf, Enabled, ValuesMixin, LambdaModifier, Another, Disabled, Group, Same
+from random import randint
+import pytest
+
 
 
 class A:
@@ -304,3 +305,79 @@ def test_maybe_enabled():
 
     assert b1.a is not None
     assert b2.a is None
+
+
+class A1:
+    b = Uplink()
+    c = Uplink()
+    id = Random()
+
+
+class B1:
+    a = Collection(A1, number=0)
+
+
+class C1:
+    a = Collection(A1, number=0)
+
+
+A1.b.linksTo(B1, B1.a)
+A1.c.linksTo(C1, C1.a)
+
+
+def test_grouped_collection():
+    a = Builder(A1).withA(Group(B1.a, 3, Same(A1, "id"))).build()
+    b = Builder(B1).withA(Group(B1.a, 3, Same(A1, "id"))).build()
+    
+    def check(b):
+        assert len(b.a) == 3
+        assert b.a[0].id == b.a[1].id and b.a[1].id == b.a[2].id
+
+    check(a.b)
+    check(b)
+    
+
+def test_2_groups_collection():
+    a = Builder(A1).withA([Group(B1.a, 2, Same(A1, "id")), Group(B1.a, 3, Same(A1, "id"))]).build()
+    b = Builder(B1).withA([Group(B1.a, 2, Same(A1, "id")), Group(B1.a, 3, Same(A1, "id"))]).build()
+    
+    def check(b):
+        assert len(b.a) == 5
+        assert b.a[0].id == b.a[1].id
+        assert b.a[1].id != b.a[2].id
+        assert b.a[2].id == b.a[3].id and b.a[3].id == b.a[4].id
+
+    check(a.b)
+    check(b)
+
+
+def test_2_uplinks_collection_groups():
+    a = Builder(A1).withA(Group(B1.a, 3, Same(A1, "c"))).build()
+    b = Builder(B1).withA(Group(B1.a, 3, Same(A1, "c"))).build()
+    
+    def check(b):
+        assert len(b.a) == 3
+        assert id(b.a[0].c) == id(b.a[1].c) and id(b.a[1].c) == id(b.a[2].c)
+        assert len(b.a[0].c.a) == 3
+        assert b.a[0].id != b.a[1].id and b.a[1].id != b.a[2].id and b.a[0].id != b.a[2].id
+        
+        c = b.a[0].c
+        
+        assert b.a[0] == c.a[0] and b.a[1] == c.a[1] and b.a[2] == c.a[2]
+        
+    check(a.b)
+    check(b)
+
+
+def test_2_group_rules():
+    a = Builder(A1).withA(Group(B1.a, 3, Same(A1, "c"), Same(A1, "id"))).build()
+    b = Builder(B1).withA(Group(B1.a, 3, Same(A1, "c"), Same(A1, "id"))).build()
+    
+    def check(b):
+        assert b.a[0].id == b.a[1].id and b.a[1].id == b.a[2].id
+        assert id(b.a[0].c) == id(b.a[1].c) and id(b.a[1].c) == id(b.a[2].c)
+        assert len(b.a[0].c.a) == 3
+
+    check(a.b)
+    check(b)
+    

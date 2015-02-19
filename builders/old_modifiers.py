@@ -1,7 +1,6 @@
 import construct as construct_package
 from builders.logger import logger
 import construct
-import model_graph as graph_utils
 
 
 __all__ = ['Modifier', 'InstanceModifier', 'ValuesMixin', 'ClazzModifier', 'ConstructModifier', 'Given', 'NumberOf', 'HavingIn', 'OneOf', 'Enabled', 'Disabled', 'LambdaModifier', 'Another']
@@ -36,44 +35,6 @@ class Modifier(object):
         return [self, other]
 
 
-class ModelStructureModifier(Modifier):
-    """
-    Base class for :py:class:`Modifier` siblings that act at classes.
-
-    Siblings should implement ``do`` method.
-
-    See :py:class:`builders.builder.Builder` to see the actual invocation.
-    """
-
-    def shouldRun(self, obj_graph=None, **kwargs):
-        return obj_graph
-
-    def do(self, obj_graph):
-        raise NotImplementedError("Do not use ModelStructureModifier on it's own")
-
-    def apply(self, obj_graph=None, **kwargs):
-        if obj_graph:
-            return self.do(obj_graph)
-
-
-class NumberOf(ModelStructureModifier):
-    """
-    Sets the target number of :py:class:`builders.constructs.Collection` elements to a given ``amount``
-    """
-    def __init__(self, what, amount):
-        assert isinstance(what, construct.Collection)
-        assert isinstance(amount, (int, long))
-
-        self.what = what
-        self.value = amount
-
-    def do(self, obj_graph):
-        self.what.number = self.amount
-        self.
-        graph_utils.count_out_links_by_local_attr(obj_graph, node, attr)
-
-
-'''
 class _ParticularClassModifier(Modifier):
     def __init__(self, classToRunOn, action):
         self.classToRunOn = classToRunOn
@@ -368,6 +329,6 @@ class Same(GroupRule):
 
     def hasNextModifier(self, instance=None):
         return self.saved_instance is not None or instance is not None
-'''
+
 
 
