@@ -65,7 +65,13 @@ class Construct(Link):
         raise NotImplementedError('This is not implemented')
 
 
-class Predefined(Construct):
+class ValueConstruct(object):
+
+    def doBuild(self, *args, **kwargs):
+        raise NotImplementedError('This is not implemented')
+
+
+class Predefined(ValueConstruct):
     """
     Builds to a predefined ``value``.
     """
@@ -88,7 +94,7 @@ class Unique(Construct):
         return builder.Builder(self.type).withA(*modifiers).build()
 
 
-class Lambda(Construct):
+class Lambda(ValueConstruct):
     """
     Function, executed during each build with an instance being constructed passed in as parameter
     """
@@ -398,7 +404,7 @@ class Uplink(Construct):
                                                          "remote_attr": dest['attr']})
 
 
-class Random(Construct):
+class Random(ValueConstruct):
     """
     :arg start: random interval start
     :arg end: random interval end
@@ -420,7 +426,7 @@ class Random(Construct):
             return value
 
 
-class Uid(Construct):
+class Uid(ValueConstruct):
     """
     Builds to a string with a fresh :py:func:`uuid.uuid4`
     """
@@ -431,7 +437,7 @@ class Uid(Construct):
 key_storage = {}
 
 
-class Key(Construct):
+class Key(ValueConstruct):
     """
     Tries to obtain fresh items from ``value_construct`` upon build via checking new item against all the previously built ones.
 

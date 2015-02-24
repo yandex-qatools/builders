@@ -44,6 +44,13 @@ def link_instance_nodes(obj_graph, n1, n2):
             obj_graph.add_edge(n2, n1, attr_dict=data)
 
 
+def remove_node_unconnected_components(graph, node):
+    com = nx.node_connected_component(graph.to_undirected(), node)
+    for n in graph.nodes():
+        if n not in com:
+            graph.remove_node(n)
+
+
 #Builder Model Class metaclass
 class BMCMeta(type):
     def __new__(cls, clsname, bases, dct):

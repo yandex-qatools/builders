@@ -37,13 +37,14 @@ class Builder:
         self._apply_graph_modifiers()
         if do_finalize:
             self._finalize_objects_structure()
-        self._apply_instance_modifiers()
+        #self._apply_instance_modifiers()
         return self.result_object
 
     def _build_default_obj_graph(self):
         import model_graph
         import model_graph as graph_utils
         self.class_graph = graph_utils.nondeepcopy_graph(model_graph.m_graph)
+        graph_utils.remove_node_unconnected_components(self.class_graph, self.clazz)
         
         mapping = {clazz: clazz() for clazz in self.class_graph.nodes()}
         self.obj_graph = graph_utils.nondeepcopy_graph(self.class_graph)
@@ -60,10 +61,12 @@ class Builder:
     def _apply_graph_modifiers(self):
         for m in self.modifiers:
             if m.shouldRun(obj_graph=self.obj_graph):
-                m.apply(obj_graph=self.obj_graph) 
+                m.apply(obj_graph=self.obj_graph)
     
-    def _apply_instance_modifiers(self):
-        pass
+    def _apply_instance_modifiers(self, instance):
+        for m in self.modifiers:
+            if m.shouldRun(instance=instance):
+                m.apply(instance=instance)
 
     def _finalize_objects_structure(self):
         #import model_graph
@@ -80,12 +83,11 @@ class Builder:
                     getattr(instance, link_data["local_attr"]).append(to_instance)
                 elif link_data["rel_type"] == One:
                     setattr(instance, link_data["local_attr"], to_instance)
-            
-            def make_construct(name, construct):
-                setattr(instance, name, construct.build([], instance=instance))
 
-            for name, value in getmembers(instance, lambda x: isinstance(x, construct.Random) or isinstance(x, construct.Uid) or isinstance(x, construct.Key)):
-                make_construct(name, value)
+            for attr, constr in getmembers(instance, lambda x: isinstance(x, construct.ValueConstruct)):
+                setattr(instance, attr, constr.doBuild([], instance=instance))
+
+            self._apply_instance_modifiers(instance)
 
 
     def build(self, with_graph=False, do_finalize=True):
