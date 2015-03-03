@@ -175,6 +175,18 @@ def test_flatten():
     assert list(flatten(l)) == [1, 2, 3, 4, 5, 'ololo']
 
 
+def test_flatten_noniterable():
+    y = 100
+    assert list(flatten(y)) == [y]
+
+
+def test_flatten_function_returning_noniterable():
+    def y():
+        return 100
+
+    assert list(flatten(y)) == [100]
+
+
 def test_flatten_callable():
     def x():
         return [1, 2, 3]
