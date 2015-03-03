@@ -13,18 +13,15 @@ def flatten(l):
         Generator that flattens iterable infinitely. If an item is iterable, ``flatten`` descends on it.
         If it is callable, it descends on the call result (with no arguments), and it yields the item itself otherwise.
     """
-    if not isinstance(l, collections.Iterable):
-        yield l
-    else:
+    if isinstance(l, collections.Iterable) and not isinstance(l, basestring):
         for el in l:
-            if isinstance(el, collections.Iterable) and not isinstance(el, basestring):
-                for sub in flatten(el):
-                    yield sub
-            elif callable(el):
-                for sub in flatten(el()):
-                    yield sub
-            else:
-                yield el
+            for sub in flatten(el):
+                yield sub
+    elif callable(l):
+        for sub in flatten(l()):
+            yield sub
+    else:
+        yield l
 
 
 class Builder:
