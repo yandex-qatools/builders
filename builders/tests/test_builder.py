@@ -179,21 +179,14 @@ def test_flatten():
 
 def test_flatten_noniterable():
     y = 100
-    f = flatten(y)
-
-    assert f.next() == y
-    with pytest.raises(StopIteration):
-        f.next()
+    assert list(flatten(y)) == [y]
 
 
 def test_flatten_function_returning_noniterable():
     def y():
         return 100
-    f = flatten(y)
 
-    assert f.next() == 100
-    with pytest.raises(StopIteration):
-        f.next()
+    assert list(flatten(y)) == [100]
 
 
 def test_flatten_callable():
