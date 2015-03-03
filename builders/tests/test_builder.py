@@ -176,7 +176,8 @@ def test_flatten():
 
 
 def test_flatten_callable():
-    x = lambda: [1, 2, 3]
+    def x():
+        return [1, 2, 3]
     y = [4, 5, x]
 
     assert list(flatten(y)) == [4, 5, 1, 2, 3]

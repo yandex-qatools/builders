@@ -213,14 +213,14 @@ Down.up.linksTo(Up, Up.downs)
 def test_reuse():
     d1 = Builder(Down).withA(InstanceModifier(Up).thatSets(id=1)).build()
 
-    # assert d1 in d1.up.downs FIXME: this should work
+    assert d1 in d1.up.downs  # FIXME: this should work
 
     d2 = Builder(Down).withA(InstanceModifier(Up).thatSets(id=1)).build()
     d3 = Builder(Down).withA(InstanceModifier(Up).thatSets(id=2)).build()
 
     assert d1.up == d2.up
-    # assert d1 in d2.up.downs FIXME: this should work
-    # assert d2 in d2.up.downs FIXME: this should work
+    assert d1 in d2.up.downs  # FIXME: this should work
+    assert d2 in d2.up.downs  # FIXME: this should work
     assert d1.up != d3.up
 
 
