@@ -1,5 +1,3 @@
-import pytest
-
 from builders.builder import Builder, flatten
 from builders.construct import Unique, Collection, Reused
 from builders.modifiers import InstanceModifier
