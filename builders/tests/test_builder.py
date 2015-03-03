@@ -1,3 +1,5 @@
+import pytest
+
 from builders.builder import Builder, flatten
 from builders.construct import Unique, Collection, Reused
 from builders.modifiers import InstanceModifier
@@ -173,6 +175,25 @@ def test_flatten():
     l = [[1, 2, 3], [4], [[[5]]], 'ololo']
 
     assert list(flatten(l)) == [1, 2, 3, 4, 5, 'ololo']
+
+
+def test_flatten_noniterable():
+    y = 100
+    f = flatten(y)
+
+    assert f.next() == y
+    with pytest.raises(StopIteration):
+        f.next()
+
+
+def test_flatten_function_returning_noniterable():
+    def y():
+        return 100
+    f = flatten(y)
+
+    assert f.next() == 100
+    with pytest.raises(StopIteration):
+        f.next()
 
 
 def test_flatten_callable():
