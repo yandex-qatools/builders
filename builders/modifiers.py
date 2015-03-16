@@ -50,36 +50,115 @@ class ModelStructureModifier(Modifier):
     def do(self, obj_graph):
         raise NotImplementedError("Do not use ModelStructureModifier on it's own")
 
-    def apply(self, obj_graph=None, **kwargs):
+    def apply(self, obj_graph=None, modifiers=(), **kwargs):
         if obj_graph:
-            return self.do(obj_graph)
+            return self.do(obj_graph, modifiers=[m for m in modifiers if m != self], **kwargs)
 
 
-class NumberOf(ModelStructureModifier):
+
+class HavingIn(ModelStructureModifier):
+    """
+    Adds ``instances`` to a given :py:class:`builders.constructs.Collection`.
+
+    If ``instance`` is a number, **that much** new instances are added to the ``Collection`` target number.
+
+    Else, that ``instance`` is added to the ``Collection`` as a pre-built one.
+    """
+    def __init__(self, what, *instances):
+        assert isinstance(what, construct.Collection)
+
+        self.what = what
+        self.value = instances
+        self.obj_graph = None
+        
+        from model_graph import m_graph
+        self.container_class = graph_utils.get_out_edges_by_(m_graph, link_attr="construct", value=self.what)[0][0]
+
+    def _add_successor_object(self, container=None, what=None, modifiers=()):
+        assert container is not None
+        new_child, child_graph = (None, None)
+        
+        if what is None:
+            from builder import Builder
+            new_child, child_graph = Builder(self.what.type).withA(modifiers).build(with_graph=True, do_finalize=False)
+            child_graph.remove_nodes_from(child_graph.successors(self.container_class))
+            self.obj_graph.add_nodes_from(child_graph.nodes(data=True))
+            self.obj_graph.add_edges_from(child_graph.edges(data=True))
+        else:
+            assert isinstance(what, self.what.type)
+            new_child = what
+            #child_graph = what.__object_graph__
+
+        graph_utils.link_instance_nodes(self.obj_graph, container, new_child)
+        
+
+    def do(self, obj_graph, modifiers=()):
+        self.obj_graph = obj_graph
+        for instance in obj_graph.successors(self.container_class):
+            for something_new in self.value:
+                if isinstance(something_new, (int, long)):
+                    for _ in xrange(something_new):
+                        self._add_successor_object(container=instance, modifiers=modifiers)
+                elif isinstance(something_new, self.what.type):
+                    self._add_successor_object(container=instance, what=something_new)
+                else:
+                    raise Exception("You must provide a NUMBER or an INSTANCE of %s for this HavingIn modifier" % self.what.type.__name__)
+
+
+class NumberOf(HavingIn):
     """
     Sets the target number of :py:class:`builders.constructs.Collection` elements to a given ``amount``
     """
     def __init__(self, what, amount):
-        assert isinstance(what, construct.Collection)
-        assert isinstance(amount, (int, long))
-
-        self.what = what
+        HavingIn.__init__(self, what, amount)
         self.value = amount
 
-    def do(self, obj_graph):
-        from model_graph import m_graph
-        from builder import Builder
-        container_class = graph_utils.get_out_edges_by_(m_graph, link_attr="construct", value=self.what)[0][0]
-        for instance in obj_graph.successors(container_class):
+    def do(self, obj_graph, modifiers=()):
+        self.obj_graph = obj_graph
+        for instance in obj_graph.successors(self.container_class):
             child_links = graph_utils.get_out_edges_by_(obj_graph, instance, link_attr="construct", value=self.what)
-            while len(child_links) < self.value:
-                (new_child, child_graph) = Builder(self.what.type).build(with_graph=True, do_finalize=False)
-                child_graph.remove_nodes_from(child_graph.successors(container_class))
-                obj_graph.add_nodes_from(child_graph.nodes(data=True))
-                obj_graph.add_edges_from(child_graph.edges(data=True))
-                graph_utils.link_instance_nodes(obj_graph, instance, new_child)
-                child_links.append(new_child)
+            assert self.value >= len(child_links), "NumberOf %s elements (%d) can't be smaller than already exist (%d)" % (self.what.type.__name__, self.value, len(child_links))
+            for _ in xrange(self.value - len(child_links)):
+                self._add_successor_object(container=instance, modifiers=modifiers)
 
+
+class Given(object):
+    """
+    Supplied pre-defined ``value`` for a given ``construct``.
+    """
+    def __init__(self, what, something):
+        self.what = what
+        self.value = something
+        
+        from model_graph import m_graph
+        self.edge = graph_utils.get_out_edges_by_(m_graph, link_attr="construct", value=self.what)[0]
+        self.container_class = self.edge[0]
+
+    def shouldRun(self, instance=None,  obj_graph=None, **kwargs):
+        from model_graph import BuilderModelClass
+        if isinstance(self.value, BuilderModelClass):
+            return obj_graph
+        else:
+            return isinstance(instance, self.container_class)
+
+    def apply(self, obj_graph=None, instance=None, **kwargs):
+        if obj_graph or instance:
+            return self.do(obj_graph, instance)
+
+    def do(self, obj_graph, instance):
+        #TODO: need support for given collections
+        from model_graph import BuilderModelClass, get_out_edges_by_, get_in_edges_by_
+        if instance is not None:
+            setattr(instance, self.edge[-1]["local_attr"], self.value)
+        elif obj_graph is not None:
+            for instance in obj_graph.successors(self.container_class):
+                if isinstance(self.value, BuilderModelClass):
+                    out_edges = get_out_edges_by_(obj_graph, node=instance, link_attr="local_attr", value=self.edge[-1]["local_attr"])
+                    in_edges = get_in_edges_by_(obj_graph, node=instance, link_attr="remote_attr", value=self.edge[-1]["local_attr"])
+                    obj_graph.remove_edges_from(out_edges + in_edges)
+                    graph_utils.remove_node_unconnected_components(obj_graph, instance)
+                    graph_utils.link_instance_nodes(obj_graph, instance, self.value)
+                
 
 
 class _ParticularClassModifier(Modifier):
@@ -184,6 +263,7 @@ class ConstructModifier(ClazzModifier):
                 self.doApply(value)
 
 
+'''
 class Given(ConstructModifier):
     """
     Supplied pre-defined ``value`` for a given ``construct``.
@@ -195,7 +275,7 @@ class Given(ConstructModifier):
     def doApply(self, construct):
         construct.value = self.value
 
-'''
+
 class NumberOf(ConstructModifier):
     """
     Sets the target number of :py:class:`builders.constructs.Collection` elements to a given ``amount``
@@ -209,7 +289,7 @@ class NumberOf(ConstructModifier):
 
     def doApply(self, construct):
         construct.set(self.value)
-'''
+
 
 class HavingIn(ConstructModifier):
     """
@@ -228,6 +308,7 @@ class HavingIn(ConstructModifier):
     def doApply(self, construct):
         for i in self.value:
             construct.add(i)
+'''
 
 
 class OneOf(ConstructModifier):

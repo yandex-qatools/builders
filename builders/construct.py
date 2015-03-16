@@ -65,23 +65,6 @@ class Construct(Link):
         raise NotImplementedError('This is not implemented')
 
 
-class ValueConstruct(object):
-
-    def doBuild(self, *args, **kwargs):
-        raise NotImplementedError('This is not implemented')
-
-
-class Predefined(ValueConstruct):
-    """
-    Builds to a predefined ``value``.
-    """
-    def __init__(self, value):
-        self.value = value
-
-    def doBuild(self, *args, **kwargs):
-        return self.value
-
-
 class Unique(Construct):
     """
     Builds a new instance of ``type`` with a separate :py:class:`builders.Builder`
@@ -92,23 +75,6 @@ class Unique(Construct):
 
     def doBuild(self, modifiers, **kwargs):
         return builder.Builder(self.type).withA(*modifiers).build()
-
-
-class Lambda(ValueConstruct):
-    """
-    Function, executed during each build with an instance being constructed passed in as parameter
-    """
-    def __init__(self, functionToExecute):
-        self.default_function = functionToExecute
-        self.alternative_function = None
-
-    def doBuild(self, modifiers, **kwargs):
-        if not self.alternative_function:
-            value = self.default_function(kwargs['instance'])
-        else:
-            value = self.alternative_function(kwargs['instance'])
-            self.alternative_function = None
-        return value
 
 
 class Collection(Unique):
@@ -402,6 +368,41 @@ class Uplink(Construct):
                                                          "rel_type": mg.relation_types[Uplink],
                                                          "local_attr": local_attr,
                                                          "remote_attr": dest['attr']})
+
+
+class ValueConstruct(object):
+
+    def doBuild(self, *args, **kwargs):
+        raise NotImplementedError('This is not implemented')
+
+
+class Predefined(ValueConstruct):
+    """
+    Builds to a predefined ``value``.
+    """
+    def __init__(self, value):
+        self.value = value
+
+    def doBuild(self, *args, **kwargs):
+        return self.value
+
+
+class Lambda(ValueConstruct):
+    """
+    Function, executed during each build with an instance being constructed passed in as parameter
+    """
+    def __init__(self, functionToExecute):
+        self.default_function = functionToExecute
+        self.alternative_function = None
+
+    def doBuild(self, modifiers, **kwargs):
+        if not self.alternative_function:
+            value = self.default_function(kwargs['instance'])
+        else:
+            value = self.alternative_function(kwargs['instance'])
+            self.alternative_function = None
+        return value
+
 
 
 class Random(ValueConstruct):
