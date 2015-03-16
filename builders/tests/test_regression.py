@@ -18,19 +18,19 @@ class Hero(BuilderModelClass):
 
 class Squad(BuilderModelClass):
     name = ''
-    units = Collection(Unit)
-    leader = Unique(Hero)
+    units = Collection(Unit, uplink=Unit.squad)
+    leader = Unique(Hero, uplink=Hero.squad)
     player = Uplink()
 
 
 class Player(BuilderModelClass):
     name = ''
-    squads = Collection(Squad)
+    squads = Collection(Squad, uplink=Squad.player)
 
 
-Unit.squad.linksTo(Squad, Squad.units)
-Squad.player.linksTo(Player, Player.squads)
-Hero.squad.linksTo(Squad, Squad.leader)
+#Unit.squad.linksTo(Squad, Squad.units)
+#Squad.player.linksTo(Player, Player.squads)
+#Hero.squad.linksTo(Squad, Squad.leader)
 
 
 def test_create_default():

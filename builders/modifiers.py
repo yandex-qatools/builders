@@ -1,6 +1,7 @@
+from builders import graph_utils
 from builders.logger import logger
 import construct
-import model_graph as graph_utils
+import networkx as nx
 
 
 __all__ = ['Modifier', 'InstanceModifier', 'ValuesMixin', 'ClazzModifier', 'ConstructModifier', 'Given', 'NumberOf', 'HavingIn', 'OneOf', 'Enabled', 'Disabled', 'LambdaModifier', 'Another']
@@ -11,6 +12,9 @@ class Modifier(object):
     Base class for build process modifiers.
     Child classes should implement ``apply`` method.
     """
+    
+    priority = 9999 # :)
+    
     def apply(self, *args, **kwargs):
         """
         Perform the actual modification.
@@ -44,121 +48,206 @@ class ModelStructureModifier(Modifier):
     See :py:class:`builders.builder.Builder` to see the actual invocation.
     """
 
-    def shouldRun(self, obj_graph=None, **kwargs):
-        return obj_graph
-
-    def do(self, obj_graph):
+    def do(self, graph, modifiers=()):
         raise NotImplementedError("Do not use ModelStructureModifier on it's own")
 
-    def apply(self, obj_graph=None, modifiers=(), **kwargs):
-        if obj_graph:
-            return self.do(obj_graph, modifiers=[m for m in modifiers if m != self], **kwargs)
+    def apply(self, graph, modifiers=(), **kwargs):
+        return self.do(graph, modifiers=[m for m in modifiers if m != self], **kwargs)
 
+    def get_links(self, graph, node=None, uplink=False):
+        from builders.model_graph import Link
+        search_by = "construct" if not uplink else "uplink_for"
+        return [Link(*link, graph=graph) for link in graph_utils.get_out_edges_by_(graph, node=node, link_attr=search_by, value=self.what)]
 
+    def get_default_link(self):
+        from builders.model_graph import m_graph
+        return self.get_links(m_graph)[0]
 
-class HavingIn(ModelStructureModifier):
-    """
-    Adds ``instances`` to a given :py:class:`builders.constructs.Collection`.
-
-    If ``instance`` is a number, **that much** new instances are added to the ``Collection`` target number.
-
-    Else, that ``instance`` is added to the ``Collection`` as a pre-built one.
-    """
-    def __init__(self, what, *instances):
-        assert isinstance(what, construct.Collection)
-
-        self.what = what
-        self.value = instances
-        self.obj_graph = None
-        
-        from model_graph import m_graph
-        self.container_class = graph_utils.get_out_edges_by_(m_graph, link_attr="construct", value=self.what)[0][0]
-
-    def _add_successor_object(self, container=None, what=None, modifiers=()):
-        assert container is not None
-        new_child, child_graph = (None, None)
-        
-        if what is None:
-            from builder import Builder
-            new_child, child_graph = Builder(self.what.type).withA(modifiers).build(with_graph=True, do_finalize=False)
-            child_graph.remove_nodes_from(child_graph.successors(self.container_class))
-            self.obj_graph.add_nodes_from(child_graph.nodes(data=True))
-            self.obj_graph.add_edges_from(child_graph.edges(data=True))
+    def get_default_uplink(self):
+        from builders.model_graph import m_graph
+        uplinks = self.get_links(m_graph, uplink=True)
+        if uplinks:
+            return uplinks[0]
         else:
-            assert isinstance(what, self.what.type)
-            new_child = what
-            #child_graph = what.__object_graph__
+            return None
 
-        graph_utils.link_instance_nodes(self.obj_graph, container, new_child)
-        
+    def get_affected_nodes(self, graph):
+        links = self.get_links(graph)
+        nodes = []
+        for link in links:
+            if link.source() not in nodes:
+                nodes.append(link.source())
+        return nodes
 
-    def do(self, obj_graph, modifiers=()):
-        self.obj_graph = obj_graph
-        for instance in obj_graph.successors(self.container_class):
-            for something_new in self.value:
-                if isinstance(something_new, (int, long)):
-                    for _ in xrange(something_new):
-                        self._add_successor_object(container=instance, modifiers=modifiers)
-                elif isinstance(something_new, self.what.type):
-                    self._add_successor_object(container=instance, what=something_new)
-                else:
-                    raise Exception("You must provide a NUMBER or an INSTANCE of %s for this HavingIn modifier" % self.what.type.__name__)
+    def get_affected_destination_nodes(self, graph):
+        links = self.get_links(graph)
+        nodes = []
+        for link in links:
+            if link.destination() not in nodes:
+                nodes.append(link.destination())
+        return nodes
 
 
-class NumberOf(HavingIn):
+class DataDependentModifier(ModelStructureModifier):
+    def shouldRun(self, object_graph=None, **kwargs):
+        return object_graph
+
+    def apply(self, object_graph=None, modifiers=(), **kwargs):
+        if object_graph:
+            ModelStructureModifier.apply(self, object_graph, modifiers)
+
+
+class DataIndependentModifier(ModelStructureModifier):
+    def shouldRun(self, class_graph=None, **kwargs):
+        return class_graph
+
+    def apply(self, class_graph=None, modifiers=(), **kwargs):
+        if class_graph:
+            ModelStructureModifier.apply(self, class_graph, modifiers)
+
+
+class NumberOf(DataIndependentModifier):
     """
     Sets the target number of :py:class:`builders.constructs.Collection` elements to a given ``amount``
     """
+    priority = 20
     def __init__(self, what, amount):
-        HavingIn.__init__(self, what, amount)
+        assert isinstance(what, construct.Collection)
+        self.what = what
         self.value = amount
 
-    def do(self, obj_graph, modifiers=()):
-        self.obj_graph = obj_graph
-        for instance in obj_graph.successors(self.container_class):
-            child_links = graph_utils.get_out_edges_by_(obj_graph, instance, link_attr="construct", value=self.what)
-            assert self.value >= len(child_links), "NumberOf %s elements (%d) can't be smaller than already exist (%d)" % (self.what.type.__name__, self.value, len(child_links))
-            for _ in xrange(self.value - len(child_links)):
-                self._add_successor_object(container=instance, modifiers=modifiers)
-
-
-class Given(object):
-    """
-    Supplied pre-defined ``value`` for a given ``construct``.
-    """
-    def __init__(self, what, something):
-        self.what = what
-        self.value = something
-        
-        from model_graph import m_graph
-        self.edge = graph_utils.get_out_edges_by_(m_graph, link_attr="construct", value=self.what)[0]
-        self.container_class = self.edge[0]
-
-    def shouldRun(self, instance=None,  obj_graph=None, **kwargs):
-        from model_graph import BuilderModelClass
-        if isinstance(self.value, BuilderModelClass):
-            return obj_graph
+    def do(self, graph, modifiers=()):
+        links = self.get_links(graph)
+        if len(links) <= self.value:
+            default_link = self.get_default_link()
+            [default_link.add_to(graph) for _ in range(self.value - len(links))]
+            if len(links) == 0:
+                uplink = self.get_default_uplink()
+                if uplink:
+                    uplink.add_to(graph)
         else:
-            return isinstance(instance, self.container_class)
+            [links[-1 - i].remove() for i in range(len(links) - self.value)]
+            if self.value == 0:
+                uplinks = self.get_links(graph, uplink=True)
+                [uplink.remove() for uplink in uplinks]
 
-    def apply(self, obj_graph=None, instance=None, **kwargs):
-        if obj_graph or instance:
-            return self.do(obj_graph, instance)
 
-    def do(self, obj_graph, instance):
-        #TODO: need support for given collections
-        from model_graph import BuilderModelClass, get_out_edges_by_, get_in_edges_by_
-        if instance is not None:
-            setattr(instance, self.edge[-1]["local_attr"], self.value)
-        elif obj_graph is not None:
-            for instance in obj_graph.successors(self.container_class):
-                if isinstance(self.value, BuilderModelClass):
-                    out_edges = get_out_edges_by_(obj_graph, node=instance, link_attr="local_attr", value=self.edge[-1]["local_attr"])
-                    in_edges = get_in_edges_by_(obj_graph, node=instance, link_attr="remote_attr", value=self.edge[-1]["local_attr"])
-                    obj_graph.remove_edges_from(out_edges + in_edges)
-                    graph_utils.remove_node_unconnected_components(obj_graph, instance)
-                    graph_utils.link_instance_nodes(obj_graph, instance, self.value)
-                
+class More(NumberOf):
+    def __init__(self, what, amount):
+        assert isinstance(what, construct.Collection)
+        self.what = what
+        self.value = amount
+
+    def do(self, graph, modifiers=()):
+        self.value += len(self.get_links(graph))
+        NumberOf.do(self, graph, modifiers)
+
+
+class Enabled(DataIndependentModifier):
+    """
+    Turns on given :py:class:`builders.construct.Maybe` once.
+    """
+    priority = 10
+    def __init__(self, what):
+        assert isinstance(what, construct.Maybe)
+        self.what = what
+
+    def do(self, graph, modifiers=()):
+        links = self.get_links(graph)
+        if links:
+            return
+        
+        self.get_default_link().add_to(graph)
+        uplink = self.get_default_uplink()
+        if uplink:
+            uplink.add_to(graph) 
+        
+
+class Disabled(Enabled):
+    """
+    Like :py:class:`Enabled`, but the other way around.
+    """
+    def do(self, graph, modifiers=()):
+        [link.remove() for link in self.get_links(graph)]
+        [uplink.remove() for uplink in self.get_links(graph, uplink=True)]
+
+
+class HavingIn(DataDependentModifier):
+    def __init__(self, what, *instances):
+        assert isinstance(what, construct.Collection)
+        for obj in instances:
+            assert isinstance(obj, what.getTypeToBuild())
+        self.what = what
+        self.value = instances
+
+    def do(self, graph, modifiers=()):
+        affected_objs = self.get_affected_nodes(graph)
+        for obj in affected_objs:
+            links = self.get_links(graph, obj)
+            attr = links[0].source_attr()
+            value = getattr(obj, attr)
+            for i in xrange(len(self.value)):
+                if value:
+                    [link.remove_destination() for link in links if link.destination() == value[-i-1]]
+                    value.remove(value[-i-1])
+            value += self.value
+
+
+class Given(DataDependentModifier):
+    def __init__(self, what, value):
+        assert not isinstance(what, construct.Collection), "Can't apply Given to Collection, use HavingIn instead."
+        self.what = what
+        self.value = value
+
+    def do(self, graph, modifiers=()):
+        links = self.get_links(graph)
+        for link in links:
+            setattr(link.source(), link.source_attr(), self.value)
+            link.remove_destination()
+
+
+class OneOf(ModelStructureModifier):
+    class_graph = None
+    class_graph_saved = None
+
+    def __init__(self, what, *modifiers):
+        assert isinstance(what, construct.Collection)
+        
+        self.what = what
+        self.value = list(modifiers)
+        self.subtree_mod = False
+
+    def shouldRun(self, instance=None, clazz=None, class_graph=None, object_graph=None, **kwargs):
+        return instance or object_graph or clazz or class_graph
+
+    def apply(self, instance=None, clazz=None, class_graph=None, object_graph=None, modifiers=(), **kwargs):
+        if not self.subtree_mod:
+            if class_graph:
+                self.subtree_mod = True
+                self.class_graph = class_graph
+                affected_nodes = self.get_affected_destination_nodes(self.class_graph)
+                for node in affected_nodes:
+                    self.class_graph.node[node]["extra_mods"] = tuple(list(self.class_graph.node[node]["extra_mods"]) + [[self]])
+            return
+        else:
+            if class_graph:
+                self.class_graph_saved = graph_utils.nondeepcopy_graph(self.class_graph)
+            elif object_graph:
+                graph_utils.replace_graph(self.class_graph_saved, self.class_graph)
+            
+            self.do(instance=instance, clazz=clazz, class_graph=class_graph, object_graph=object_graph)
+
+    def do(self, instance, clazz, class_graph, object_graph, modifiers=()):
+        for mod in self.value:
+            if mod.shouldRun(instance=instance, clazz=clazz, class_graph=class_graph, object_graph=object_graph):
+                mod.apply(instance=instance, clazz=clazz, class_graph=class_graph, object_graph=object_graph)
+
+
+def Another(collection, *modifiers):
+    """
+    Add another instance to given ``collection`` with given ``mod``
+    """
+    return [More(collection, 1), OneOf(collection, *modifiers)]
 
 
 class _ParticularClassModifier(Modifier):
@@ -243,15 +332,10 @@ class ClazzModifier(Modifier):
             return self.do(clazz)
 
 
-class ConstructModifier(ClazzModifier):
-    """
-    Base class for :py:class:`ClazzModifier` that work on a particular ``construct`` object within a class
-
-    Siblings should implement ``doApply`` method.
-    """
-
-    def __init__(self, construct):
-        self.construct = construct
+class ValueConstructModifier(ClazzModifier):
+    def __init__(self, constr):
+        assert isinstance(constr, construct.ValueConstruct)
+        self.construct = constr
 
     def do(self, clazz):
         logger.debug('%s applied to %s' % (self, clazz))
@@ -263,95 +347,12 @@ class ConstructModifier(ClazzModifier):
                 self.doApply(value)
 
 
-'''
-class Given(ConstructModifier):
-    """
-    Supplied pre-defined ``value`` for a given ``construct``.
-    """
-    def __init__(self, construct, value):
-        ConstructModifier.__init__(self, construct)
-        self.value = value
-
-    def doApply(self, construct):
-        construct.value = self.value
-
-
-class NumberOf(ConstructModifier):
-    """
-    Sets the target number of :py:class:`builders.constructs.Collection` elements to a given ``amount``
-    """
-    def __init__(self, what, amount):
-        assert isinstance(what, construct.Collection)
-        assert isinstance(amount, (int, long))
-
-        ConstructModifier.__init__(self, what)
-        self.value = amount
-
-    def doApply(self, construct):
-        construct.set(self.value)
-
-
-class HavingIn(ConstructModifier):
-    """
-    Adds ``instances`` to a given :py:class:`builders.constructs.Collection`.
-
-    If ``instance`` is a number, **that much** new instances are added to the ``Collection`` target number.
-
-    Else, that ``instance`` is added to the ``Collection`` as a pre-built one.
-    """
-    def __init__(self, what, *instances):
-        assert isinstance(what, construct.Collection)
-
-        ConstructModifier.__init__(self, what)
-        self.value = instances
-
-    def doApply(self, construct):
-        for i in self.value:
-            construct.add(i)
-'''
-
-
-class OneOf(ConstructModifier):
-    """
-    Applies given ``modifiers`` to one of objects build by :py:class:`builders.construct.Collection`.
-    """
-    def __init__(self, what, *modifiers):
-        assert isinstance(what, construct.Collection)
-
-        ConstructModifier.__init__(self, what)
-        self.value = list(modifiers)
-
-    def doApply(self, construct):
-        construct.modifiers.append(self.value)
-
-
-class Enabled(ConstructModifier):
-    """
-    Turns on given :py:class:`builders.construct.Maybe` once.
-    """
-    def __init__(self, what):
-        assert isinstance(what, construct.Maybe)
-        ConstructModifier.__init__(self, what)
-        self.value = True
-
-    def doApply(self, construct):
-        construct.enabled = True
-
-
-class Disabled(Enabled):
-    """
-    Like :py:class:`Enabled`, but the other way around.
-    """
-    def doApply(self, construct):
-        construct.enabled = False
-
-
-class LambdaModifier(ConstructModifier):
+class LambdaModifier(ValueConstructModifier):
     """
     Replaces function in :py:class:`builders.construct.Lambda` with given new_lambda
     """
     def __init__(self, construct, new_lambda):
-        ConstructModifier.__init__(self, construct)
+        ValueConstructModifier.__init__(self, construct)
         self.value = new_lambda
 
     def doApply(self, lambda_construct):
@@ -377,83 +378,3 @@ class ValuesMixin(object):
     @classmethod
     def values(clz, **kw):
         return InstanceModifier(clz).thatCarefullySets(**kw)
-
-
-def Another(collection, *modifiers):
-    """
-    Add another instance to given ``collection`` with given ``mod``
-    """
-    return [HavingIn(collection, 1), OneOf(collection, *modifiers)]
-
-
-class Group(ConstructModifier):
-    """
-    Adds ``instances`` to a given :py:class:`builders.constructs.Collection`.
-
-    If ``instance`` is a number, **that much** new instances are added to the ``Collection`` target number.
-
-    Else, that ``instance`` is added to the ``Collection`` as a pre-built one.
-    """
-    def __init__(self, what, size, *group_rules):
-        assert isinstance(what, construct.Collection)
-
-        ConstructModifier.__init__(self, what)
-        self.value = [size, group_rules]
-
-    def doApply(self, construct):
-        construct.add_group(self.value)
-
-
-class GroupRule(object):
-    def getNextModifier(self, instance):
-        raise NotImplementedError("Do not use GroupRule on it's own")
-
-    def hasNextModifier(self, instance=None):
-        raise NotImplementedError("Do not use GroupRule on it's own")
-    
-    def handleGroupElement(self, instance):
-        pass
-
-
-class Same(GroupRule):
-
-    def __init__(self, clazz, field):
-        self.clazz = clazz
-        self.field = field
-        self.saved_instance = None
-
-    def getNextModifier(self, instance=None):
-#        mods = []
-
-        if self.saved_instance is None:
-            if instance is None:
-                return []
-            self.saved_instance = instance
-
-        field_value = getattr(self.saved_instance, self.field)
-        mods = [InstanceModifier(self.clazz).thatSets(**{self.field : field_value})]
-        
-#        field_value = getattr(self.saved_instance, self.field)
-#        class_field_value = getattr(self.saved_instance.__class__, self.field)
-#        if isinstance(class_field_value, construct_package.Construct):
-#            if isinstance(class_field_value, construct_package.Collection):
-#                mods.append(HavingIn(class_field_value, instance))
-#            else:
-#                mods.append(Given(class_field_value, instance))
-#        else:
-#            mods.append(InstanceModifier(self.clazz).thatSets(**{self.field : field_value}))
-
-        return mods
-
-    def handleGroupElement(self, instance):
-        assert instance is not None, "You don't have to handle 'None' element"
-        if self.saved_instance is None:
-            return
-        class_field_value = getattr(self.saved_instance.__class__, self.field)
-        if isinstance(class_field_value, construct.Uplink) and isinstance(class_field_value.destination, construct.Collection):
-            for field, value in class_field_value.clazz.__dict__.items():
-                if value == class_field_value.destination:
-                    getattr(getattr(self.saved_instance, self.field), field).append(instance)
-
-    def hasNextModifier(self, instance=None):
-        return self.saved_instance is not None or instance is not None

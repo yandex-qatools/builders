@@ -1,9 +1,9 @@
 from builders import graph_utils
 from builders.logger import logger
-from builders.model_graph import Many, One, m_graph
+from builders.modifiers import DataIndependentModifier, \
+    DataDependentModifier
 from inspect import getmembers
 import collections
-import construct
 import networkx as nx
 
 
@@ -26,116 +26,108 @@ def flatten(l):
 
 
 class Builder:
-    def __init__(self, clazzToBuild):
-        self.class_to_build = clazzToBuild
-        self.modifiers = []
-        self.result_object = None
 
+    def __init__(self, clazzToBuild):
+        self.clazzToBuild = clazzToBuild
+        self.modifiers = []
+        self.extra_modifiers = []
+        self.result_object = None
         self.class_graph = None
         self.obj_graph = None
+
+    def _build(self, class_graph=None, object_graph=None, extra_subtree_modifiers=None):
+        from builders.model_graph import Link, m_graph
+        assert (class_graph is not None and object_graph is not None) or (class_graph is None and object_graph is None), "You must either specify both class graph and object graph, or none of them!"
+        self.class_graph = class_graph or graph_utils.get_new_classgraph(m_graph, for_class_to_build=self.clazzToBuild)
+        self.obj_graph = object_graph or graph_utils.get_clean_graph()
+
+        is_first_run = lambda: class_graph is None and object_graph is None
+
+        self._apply_data_independent_mods(is_first_run())
         
-    def _build_default_graph(self):
-        self.class_graph = graph_utils.get_new_classgraph(for_class_to_build=self.class_to_build)
-        self.obj_graph = graph_utils.get_clean_graph()
-        self.result_object = self._build_element(self.class_to_build)
+        self._apply_class_mods()
+        
+        self.result_object = self.clazzToBuild()
+        self.obj_graph.add_node(self.result_object)
 
-    def _build_element(self, class_to_build=None, construct=None):
-        element = class_to_build()
-        element.__object_graph__ = self.obj_graph
-        self.obj_graph.add_node(element)
-        self.class_graph.node[class_to_build]["instances"] = [inst for inst in self.class_graph.node[class_to_build]["instances"]] + [element]
-        for link in class_out_edges(even Uplink):
-            for link.construct.amount:
-                linked_el = self._build_element(link[1])
-                self.obj_graph.add_edge(el, l_el, data=link[-1])
-                link_back_if_possible
-            
+        for link in self.class_graph.out_edges([self.clazzToBuild], keys=True, data=True):
+            lnk = Link(*link, graph=self.class_graph)
+            lnk.from_n = self.result_object
+            #remember extra modifiers here, because we take backlink and put from_n there as value,though it can have OneOf for example...
+            #Handle carefully!
+            lnk.create_object(self.modifiers, self.obj_graph, extra_subtree_modifiers)
 
-    def build(self, with_graph=False, do_finalize=True):
-        pass
+        self._make_value_constructs()
+        self._apply_instance_mods()
+        
+        if is_first_run():
+            self._graph_to_real_model()
+        self._apply_data_dependent_mods(is_first_run())
 
-    def withA(self, *modifiers):
-        modifiers = flatten(modifiers)
-        for mod in modifiers:
-            try:
-                self.modifiers += list(mod)
-            except:
-                self.modifiers.append(mod)
-        return self
-
-
-class ABuilder:
-    def __init__(self, clazzToBuild):
-        self.class_graph = None
-        self.clazz = clazzToBuild
-        self.modifiers = []
-        self.obj_graph = None
-        self.result_object = None
-
-    def _buildclazz(self, clazzToBuild, do_finalize=True):
-        self._build_default_obj_graph()
-        self._apply_graph_modifiers()
-        if do_finalize:
-            self._finalize_objects_structure()
-        #self._apply_instance_modifiers()
+        self.result_object.__object_graph__ = self.obj_graph
         return self.result_object
 
-    def _build_default_obj_graph(self):
-        import model_graph
-        import model_graph as graph_utils
-        self.class_graph = graph_utils.nondeepcopy_graph(model_graph.m_graph)
-        graph_utils.remove_node_unconnected_components(self.class_graph, self.clazz)
-        
-        mapping = {clazz: clazz() for clazz in self.class_graph.nodes()}
-        self.obj_graph = graph_utils.nondeepcopy_graph(self.class_graph)
-        self.obj_graph = nx.relabel_nodes(self.obj_graph, mapping)
-        self.result_object = mapping[self.clazz]
+    def _make_value_constructs(self):
+        import construct as construct
+        for name, construct in getmembers(self.result_object, lambda x: isinstance(x, construct.ValueConstruct)):
+            setattr(self.result_object, name, construct.build(self.modifiers, instance=self.result_object))
 
-        self.obj_graph.add_nodes_from(self.class_graph.nodes(data=True))
-        #self.obj_graph.add_edges_from(self.class_graph.edges(data=True))
-        for clazz, instance in mapping.items():
-            self.obj_graph.add_edge(clazz, instance)
-            self.obj_graph.add_edge(instance, clazz)
-        return self.obj_graph
-
-    def _apply_graph_modifiers(self):
-        for m in self.modifiers:
-            if m.shouldRun(obj_graph=self.obj_graph):
-                m.apply(obj_graph=self.obj_graph, modifiers=self.modifiers)
-    
-    def _apply_instance_modifiers(self, instance):
-        for m in self.modifiers:
-            if m.shouldRun(instance=instance):
-                m.apply(instance=instance)
-
-    def _finalize_objects_structure(self):
-        import model_graph as graph_utils
-        graph_utils.remove_node_unconnected_components(self.obj_graph, self.result_object, exclude_nodes=self.class_graph.nodes())
+    def _graph_to_real_model(self):
+        from builders.model_graph import Link
+        import construct as construct
         for instance in self.obj_graph.nodes():
-            if instance in self.class_graph.nodes():
-                continue
-            for _, to_instance, link_data in self.obj_graph.out_edges([instance], data=True):
-                if to_instance in self.class_graph.nodes():
+            for attr, constr in getmembers(instance, lambda x: isinstance(x, construct.Construct)):
+                links = graph_utils.get_out_edges_by_(self.obj_graph, instance, dct={"construct": constr})
+                if not links:
+                    setattr(instance, attr, None)
                     continue
-                if link_data["rel_type"] == Many:
-                    if not isinstance(getattr(instance, link_data["local_attr"]), list):
-                        setattr(instance, link_data["local_attr"], [])
-                    getattr(instance, link_data["local_attr"]).append(to_instance)
-                elif link_data["rel_type"] == One:                    
-                    setattr(instance, link_data["local_attr"], to_instance)
+                for l in links:
+                    link = Link(*l)
+                    if isinstance(link.get_construct(), construct.Collection):
+                        if not isinstance(getattr(instance, attr), list):
+                            setattr(instance, attr, [])
+                        getattr(instance, attr).append(link.destination())
+                    else:                    
+                        setattr(instance, attr, link.destination())
 
-            for attr, constr in getmembers(instance, lambda x: isinstance(x, construct.ValueConstruct)):
-                setattr(instance, attr, constr.doBuild([], instance=instance))
+    def _get_extra_mods(self):
+        node_mods = self.class_graph.node[self.clazzToBuild]["extra_mods"]
+        mods = node_mods[0] if node_mods else []
+        self.class_graph.node[self.clazzToBuild]["extra_mods"] = tuple(list(node_mods)[1:])
+        return mods
 
-            self._apply_instance_modifiers(instance)
-            instance.__object_graph__ = self.obj_graph
+    def _apply_instance_mods(self):
+        # include valueconstr mod here???
+        [m.apply(instance=self.result_object) for m in self.modifiers if m.shouldRun(instance=self.result_object)]
+
+    def _apply_class_mods(self):
+        [m.apply(clazz=self.clazzToBuild) for m in self.modifiers if m.shouldRun(clazz=self.clazzToBuild)]
+
+    def _apply_graph_mods(self, is_first_run, class_graph=None, object_graph=None):
+        from builders.model_graph import Link
+        mods_to_apply = []
+        if is_first_run:
+            default_mods = list(flatten([Link(edge[0], edge[1], None, edge[2]).get_construct().getDefaultModifiers() for edge in self.class_graph.edges(data=True)]))
+            mods_to_apply = default_mods + self.modifiers
+            graph_utils.remove_node_unconnected_components(class_graph or object_graph, self.clazzToBuild if class_graph else self.result_object)
+            [m.apply(class_graph=class_graph, object_graph=object_graph) for m in mods_to_apply if m.shouldRun(class_graph=class_graph, object_graph=object_graph)]
+        
+        if not self.extra_modifiers:
+            self.extra_modifiers = self._get_extra_mods()
+            self.modifiers += self.extra_modifiers
+        [m.apply(class_graph=class_graph, object_graph=object_graph) for m in self.extra_modifiers if m.shouldRun(class_graph=class_graph, object_graph=object_graph)]
 
 
-    def build(self, with_graph=False, do_finalize=True):
-        if with_graph:
-            return (self._buildclazz(self.clazz, do_finalize=do_finalize), self.obj_graph)
-        else:
-            return self._buildclazz(self.clazz)
+    def _apply_data_independent_mods(self, is_first_run):
+        self._apply_graph_mods(is_first_run, class_graph=self.class_graph)
+        #graph_utils.remove_node_unconnected_components(self.class_graph, self.clazzToBuild)
+
+    def _apply_data_dependent_mods(self, is_first_run):
+        self._apply_graph_mods(is_first_run, object_graph=self.obj_graph)
+        #graph_utils.remove_node_unconnected_components(self.obj_graph, self.result_object)
+
+    def build(self):
+        return self._build()
 
     def withA(self, *modifiers):
         modifiers = flatten(modifiers)
@@ -145,4 +137,5 @@ class ABuilder:
             except:
                 self.modifiers.append(mod)
         return self
+
 

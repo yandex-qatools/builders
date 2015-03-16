@@ -1,58 +1,31 @@
-import builder
-
-import modifiers as modifiers_package
+from builders import graph_utils
+from builders.logger import logger
 import itertools
+import builder
 import random
 import uuid
 
 
-from builders.logger import logger
 
 
 __all__ = ['Construct', 'Predefined', 'Unique', 'Collection', 'Reused', 'Random', 'Maybe', 'Uplink', 'Uid', 'Key', 'Lambda']
 
 
-class Link(object):
-    """
-    Connects this :py:class:`Construct` to another. Used mainly with :py:class:`Uplink`.
-    """
-    clazz = None
-    destination = None
-    value = None
-
-    def onBuild(self, *args, **kwargs):
-        """
-        Called when this object is built. Notifies ``self.destination`` that it now has a value.
-        """
-        if self.destination and kwargs.get('instance'):
-            logger.debug('Setting value %s for %s' % (kwargs['instance'], self.destination))
-            if not self.value:
-                self.destination.value = kwargs['instance']
-
-    def setDestination(self, clazz, destination):
-        """
-        Configures this link destination and backward link.
-        """
-        self.clazz = clazz
-        self.destination = destination
-        try:
-            if not self.destination.destination:
-                self.destination.setDestination(None, self)
-        except AttributeError:
-            pass
-
-
-class Construct(Link):
+class Construct(object):
     """
     Base class for build-generated attributes.
     Subclasses should implement `doBuild` method.
     """
+    
+    value = None
+    clazz = None
+    
     def build(self, *args, **kwargs):
         """
         Called by :py:class:`builders.builder.Builder` on the model construction.
         Returns actual pre-set value (via :py:class:`Link` mechanism) or a newly built one.
         """
-        self.onBuild(**kwargs)
+
         if self.value:
             logger.debug('%s returning pre-built value %s' % (self, self.value))
             result = self.value
@@ -64,17 +37,29 @@ class Construct(Link):
     def doBuild(self, *args, **kwargs):
         raise NotImplementedError('This is not implemented')
 
+    def getValue(self):
+        return self.value
+
+    def getDefaultModifiers(self):
+        return []
+
 
 class Unique(Construct):
     """
     Builds a new instance of ``type`` with a separate :py:class:`builders.Builder`
     with respect to currently active modifiers.
     """
-    def __init__(self, typeToBuild):
+    def __init__(self, typeToBuild, uplink=None):
         self.type = typeToBuild
+        self.uplink = uplink
+        if self.uplink:
+            self.uplink.setDestination(self)
 
-    def doBuild(self, modifiers, **kwargs):
-        return builder.Builder(self.type).withA(*modifiers).build()
+    def doBuild(self, modifiers, cl_gr, obj_gr, **kwargs):
+        return builder.Builder(self.type).withA(*modifiers)._build(cl_gr, obj_gr)
+
+    def getTypeToBuild(self):
+        return self.type
 
 
 class Collection(Unique):
@@ -82,169 +67,16 @@ class Collection(Unique):
     Builds a ``list`` of new ``typeToBuild`` objects.
     With no modifiers, list will contain ``number`` entries.
     """
-    def __init__(self, typeToBuild, number=1):
-        Unique.__init__(self, typeToBuild)
+    def __init__(self, typeToBuild, number=1, uplink=None):
+        Unique.__init__(self, typeToBuild, uplink)
         self.number = number
-        self.overrides = []
-        self.items = []
-        self.destination = []
-        self.modifiers = []
 
-    def add(self, something):
-        if isinstance(something, (int, long)):
-            self.overrides.append(lambda x: x + something)
-        else:
-            self.items.append(something)
+    def doBuild(self, modifiers, cl_gr, obj_gr, **kwargs):
+        return builder.Builder(self.type).withA(*modifiers)._build(cl_gr, obj_gr)
 
-    def set(self, amount):
-        self.overrides.append(lambda x: amount)
-
-    def build(self, *args, **kwargs):
-        result = self.doBuild(*args, **kwargs)
-
-        if result and self.value:
-            self.onBuild(**kwargs)
-        return result
-
-    def onBuild(self, *args, **kwargs):
-        if self.destination and kwargs.get('instance'):
-            logger.debug('Receiving value %s for %s' % (kwargs['instance'], self.destination))
-            if not self.value:
-                for destination in self.destination:
-                    destination.value = kwargs['instance']
-
-    def setDestination(self, clazz, destination):
-        self.clazz = clazz
-        self.destination.append(destination)
-        try:
-            if not destination.destination:
-                destination.setDestination(None, self)
-        except AttributeError:
-            pass
-
-    def doBuild(self, modifiers, **kwargs):
-        total_amount = self.number
-        for o in self.overrides:
-            total_amount = o(total_amount)
-        self.overrides = []
-
-        result = list(self.items)
-        self.items = []
-
-        if self.destination:
-            logger.debug("Collection %s found destinations %s" % (self, self.destination))
-            saved_value = self.destination[0].value
-        else:
-            saved_value = None
-        while len(result) < total_amount:
-            logger.debug("Collection %s building item of type %s" % (self, self.type))
-            logger.debug("Collection destination is %s, %s" % (self.destination, modifiers_package.classvars(self.destination)))
-            if saved_value:
-                self.destination[0].value = saved_value
-            if not saved_value and self.destination:
-                self.destination[0].value = kwargs['instance']
-            extra_modifiers = self.modifiers and self.modifiers.pop()
-            item = Unique.doBuild(self, modifiers + extra_modifiers)
-            result.append(item)
-
-        return result
-
-
-class GroupedCollection(Unique):
-    """
-    Builds a ``list`` of new ``typeToBuild`` objects.
-    With no modifiers, list will contain ``number`` entries.
-    """
-    def __init__(self, typeToBuild, number=1):
-        Unique.__init__(self, typeToBuild)
-        self.number = number
-        self.overrides = []
-        self.items = []
-        self.destination = []
-        self.modifiers = []
-        self.groups = []
-
-    def add_group(self, group):
-        assert len(group) == 2 and isinstance(group[0], (int, long))
-        if isinstance(group, list):
-            self.groups.append(group)
-            self.add(group[0])
-
-    def add(self, something):
-        if isinstance(something, (int, long)):
-            self.overrides.append(lambda x: x + something)
-        else:
-            self.items.append(something)
-
-    def set(self, amount):
-        self.overrides.append(lambda x: amount)
-
-    def build(self, *args, **kwargs):
-        result = self.doBuild(*args, **kwargs)
-
-        if result and self.value:
-            self.onBuild(**kwargs)
-        return result
-
-    def onBuild(self, *args, **kwargs):
-        if self.destination and kwargs.get('instance'):
-            logger.debug('Receiving value %s for %s' % (kwargs['instance'], self.destination))
-            if not self.value:
-                for destination in self.destination:
-                    destination.value = kwargs['instance']
-
-    def setDestination(self, clazz, destination):
-        self.clazz = clazz
-        self.destination.append(destination)
-        try:
-            if not destination.destination:
-                destination.setDestination(None, self)
-        except AttributeError:
-            pass
-
-    def doBuild(self, modifiers, **kwargs):
-        groups = self.groups[::-1]
-        self.groups = []
-        group_modifiers = []
-        
-        total_amount = self.number
-        for o in self.overrides:
-            total_amount = o(total_amount)
-        self.overrides = []
-
-        result = list(self.items)
-        self.items = []
-
-        if self.destination:
-            logger.debug("Collection %s found destinations %s" % (self, self.destination))
-            saved_value = self.destination[0].value
-        else:
-            saved_value = None
-        item = None
-        while len(result) < total_amount:
-            logger.debug("Collection %s building item of type %s" % (self, self.type))
-            logger.debug("Collection destination is %s, %s" % (self.destination, modifiers_package.classvars(self.destination)))
-            if saved_value:
-                self.destination[0].value = saved_value
-            if not saved_value and self.destination:
-                self.destination[0].value = kwargs['instance']
-            extra_modifiers = self.modifiers and self.modifiers.pop()
-            if groups:
-                group_modifiers = [rule.getNextModifier(item) for rule in groups[-1][1] if rule.hasNextModifier(item)]
-                
-            item = Unique.doBuild(self, modifiers + extra_modifiers + group_modifiers)
-            result.append(item)
-            
-            if groups:
-                for rule in groups[-1][1]:
-                    rule.handleGroupElement(item)
-                groups[-1][0] -= 1
-                if not groups[-1][0]:
-                    groups.pop()
-                    group_modifiers = []
-                    item = None
-
-        return result
+    def getDefaultModifiers(self):
+        from modifiers import NumberOf
+        return [NumberOf(self, self.number)]
 
 
 class Reused(Unique):
@@ -261,8 +93,8 @@ class Reused(Unique):
     """
     __reused_instances = {}
 
-    def __init__(self, typeToBuild, local=False, keys=[]):
-        Unique.__init__(self, typeToBuild)
+    def __init__(self, typeToBuild, local=False, keys=[], uplink=None):
+        Unique.__init__(self, typeToBuild, uplink)
         self.key_components = keys
 
         if local:
@@ -270,13 +102,19 @@ class Reused(Unique):
         else:
             self.instances = Reused.__reused_instances
 
-    def doBuild(self, modifiers, **kwargs):
-        candidate = Unique.doBuild(self, modifiers)
+    def doBuild(self, modifiers, cl_gr, obj_gr, **kwargs):
+        candidate = Unique.doBuild(self, modifiers, graph_utils.nondeepcopy_graph(cl_gr), graph_utils.nondeepcopy_graph(obj_gr)) #Careful here!!! think about modifiers
+
+#        for node in obj_gr.nodes():
+#            if [node for k in self.key_components if getattr(candidate, k) == getattr(node, k)]:
+#                return node
+#
+#        return Unique.doBuild(self, modifiers, cl_gr, obj_gr)
 
         key = tuple([self.type] + [getattr(candidate, k) for k in self.key_components])
 
         if not self.instances.get(key):
-            self.instances[key] = candidate
+            self.instances[key] = Unique.doBuild(self, modifiers, cl_gr, obj_gr)
         return self.instances[key]
 
 
@@ -292,17 +130,26 @@ class Maybe(Construct):
 
         self.construct = construct
         self.enabled = enabled
-        self.default = enabled
+        self.type = construct.type
+        self.uplink = construct.uplink
+        if self.uplink:
+            self.uplink.setDestination(self)
 
-    def doBuild(self, *args, **kwargs):
-        try:
-            if self.enabled:
-                return self.construct.doBuild(*args, **kwargs)
-        finally:
-            self.enabled = self.default
+    def build(self, *args, **kwargs):
+        return self.construct.doBuild(*args, **kwargs)
+
+    def getTypeToBuild(self):
+        return self.construct.type
+
+    def getValue(self):
+        return self.construct.getValue()
+
+    def getDefaultModifiers(self):
+        from modifiers import Disabled
+        return [Disabled(self)] if not self.enabled else []
 
 
-class Uplink(Construct):
+class Uplink(Unique):
     """
     Becomes a value of another :py:class:`Construct` when it is build.
 
@@ -315,62 +162,42 @@ class Uplink(Construct):
       See ``test_uplink.test_reuse`` -- there are commented checks.
     """
 
-    def __init__(self, reusing_by=[], links_to=None):
-        self.links_to = links_to
-        if reusing_by:
-            self.reuser = Reused(None, local=True, keys=reusing_by)
-        else:
-            self.reuser = None
+    def __init__(self):
+        Unique.__init__(self, None)
+        self.destination_construct = None
+
+    def setDestination(self, remote_construct = None, type_to_build = None):
+        if remote_construct:
+            self.destination_construct = remote_construct
+        if type_to_build:
+            self.type = type_to_build
 
     def getLinkDestination(self):
-        if self.clazz and self.destination:
-            for k, v in self.clazz.__dict__.items():
-                if v == self.destination:
-                    return {"cls": self.clazz.__name__, "attr": k}
-        if self.links_to is not None:
-            res = self.links_to.split(".", 1)
-            return {"cls": res[0], "attr": res[1]}
-        return None
+        return (self.destination_construct, self.type)
 
-    def doBuild(self, modifiers, instance=None, **kwargs):
-        if not self.destination:
-            raise ValueError('Link %s has no attachment' % self)
+    def doBuild(self, modifiers, cl_gr, obj_gr, **kwargs):
+        return builder.Builder(self.type).withA(*modifiers)._build(cl_gr, obj_gr)
 
-        logger.debug('Up-linking instance for %s with Given %s value of %s' %
-                     (self.clazz, self.destination, instance))
+    #TODO: add linksTo
 
-        mods = [modifiers]
-
-        if isinstance(self.destination, Collection):
-            mods.append(modifiers_package.HavingIn(self.destination, instance))
-        else:
-            mods.append(modifiers_package.Given(self.destination, instance))
-
-        if self.reuser:
-            return self.reuser.doBuild(modifiers, **dict(instance=instance, **kwargs))
-        else:
-            return builder.Builder(self.clazz).withA(*mods).build()
-
-    def linksTo(self, clazz, destination):
-        if self.reuser:
-            self.reuser.type = clazz
-        self.setDestination(clazz, destination)
-
-        import model_graph as mg
-        dest = self.getLinkDestination()
-        edge = mg.get_out_edges_by_(mg.m_graph, node=self.clazz, link_attr="local_attr", value=dest['attr'])[0]
-        local_attr = None
-        for k, v in edge[1].__dict__.items():
-            if v == self:
-                local_attr = k
-        mg.m_graph.edge[edge[0]][edge[1]][0]["remote_attr"] = local_attr
-        mg.m_graph.add_edge(edge[1], edge[0], attr_dict={"construct": self,
-                                                         "rel_type": mg.relation_types[Uplink],
-                                                         "local_attr": local_attr,
-                                                         "remote_attr": dest['attr']})
 
 
 class ValueConstruct(object):
+    value = None
+    
+    def build(self, *args, **kwargs):
+        """
+        Called by :py:class:`builders.builder.Builder` on the model construction.
+        Returns actual pre-set value (via :py:class:`Link` mechanism) or a newly built one.
+        """
+
+        if self.value:
+            logger.debug('%s returning pre-built value %s' % (self, self.value))
+            result = self.value
+            self.value = None
+        else:
+            result = self.doBuild(*args, **kwargs)
+        return result
 
     def doBuild(self, *args, **kwargs):
         raise NotImplementedError('This is not implemented')
@@ -395,7 +222,7 @@ class Lambda(ValueConstruct):
         self.default_function = functionToExecute
         self.alternative_function = None
 
-    def doBuild(self, modifiers, **kwargs):
+    def doBuild(self, *args, **kwargs):
         if not self.alternative_function:
             value = self.default_function(kwargs['instance'])
         else:
