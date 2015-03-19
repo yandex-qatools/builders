@@ -225,14 +225,19 @@ class OneOf(ModelStructureModifier):
         if self.only_first_run and not self.executed:
             if class_graph:
                 self.executed = True
-                affected_nodes = self.get_affected_destination_nodes(class_graph)
-                
-                new_mod = OneOf(self.what, *self.value)
-                new_mod.only_first_run = False
+                affected_nodes = self.get_affected_nodes(class_graph)
                 
                 for node in affected_nodes:
-                    class_graph.node[node]["extra_mods"] = tuple(list(class_graph.node[node]["extra_mods"]) + [[new_mod]])
-            return
+                    links = self.get_links(class_graph, node)
+                    
+                    new_mod = OneOf(self.what, *self.value)
+                    new_mod.only_first_run = False
+                    
+                    for link in links:
+                        if not link.get_extra_mods():
+                            link.add_extra_mods(new_mod)
+                            break
+
         elif not self.only_first_run:
             if class_graph:
                 self.class_graph = class_graph

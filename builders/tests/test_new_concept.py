@@ -32,6 +32,8 @@ def draw(obj):
                 link["instance"] = str(link["instance"])
             if "visited_from" in link.keys():
                 link["visited_from"] = [str(x) for x in link["visited_from"]]
+            if "extra_mods" in link.keys():
+                link["extra_mods"] = [str(x) for x in link["extra_mods"]]
         js = json.dumps(d)
         
         with open(DEST_FILE, "w") as result:
@@ -43,7 +45,8 @@ class A(BuilderModelClass):
     b = Uplink()
 
 class B(BuilderModelClass):
-    values = Collection(A, uplink=A.b)
+    #values = Collection(A, uplink=A.b)
+    v = 0
     c = Uplink()
 
 class C(BuilderModelClass):
@@ -52,16 +55,18 @@ class C(BuilderModelClass):
 #A.b.linksTo(B, B.values)
 
 def test():
-    a = Builder(B).withA(NumberOf(C.values, 2), OneOf(C.values, NumberOf(B.values, 2))).build()
+    b = Builder(B).withA(NumberOf(C.values, 2), OneOf(C.values, InstanceModifier(B).thatSets(v=1)), OneOf(C.values, InstanceModifier(B).thatSets(v=2))).build()
         #withA(OneOf(C.values, NumberOf(B.values, 2), OneOf(B.values, InstanceModifier(A).thatSets(a=2)))).\
         #build()
     
-    #c = a.b.c
-#    assert len(c.values) == 2
+    c = b.c
+    assert len(c.values) == 2
+    assert len([v for v in c.values if v.v == 0]) == 1
+    assert len([v for v in c.values if v.v == 1]) == 1
 #    assert c.values[0] != c.values[1]
 #    assert len(c.values[0].values) == 1 and len(c.values[1].values) == 1
 #    assert c.values[0].values[0] != c.values[1].values[0]
-    return a
+    return c
 
 #pp.pprint(u1.__object_graph__.nodes())
 #pp.pprint(u1.__object_graph__.edges(data=True))

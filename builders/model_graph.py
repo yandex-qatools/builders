@@ -45,7 +45,10 @@ class Link(object):
             if self.is_uplink():
                 main_links = graph_utils.get_out_edges_by_(self.graph, node=self.to_n, dct={"construct": self.uplink_for()})
                 assert main_links, "Uplink is broken: can't find free main link"
-                backlink = main_links[0]   
+                for link in main_links:
+                    if not Link(*link).get_extra_mods():
+                        backlink = link
+                assert backlink, "Can't find a backlink with no extra modifiers, when building uplink. This will cause graph not corresponding to modifiers."
             else:
                 uplinks = graph_utils.get_out_edges_by_(self.graph, node=self.to_n, dct={"uplink_for": self.get_construct()})
                 assert len(uplinks) <= 1, "Found more than 1 uplink for 1 construct!"
@@ -57,6 +60,8 @@ class Link(object):
     
             #remember extra modifiers here, because we take backlink and put from_n there as value,though it can have OneOf for example...
             #Handle carefully!
+            
+            self.add_extra_mods_to_destination()
             result = self.get_construct().build(modifiers, self.graph, object_graph)
 
         if not result:
@@ -80,6 +85,15 @@ class Link(object):
 
     def get_instance(self):
         return self.data["instance"]
+
+    def get_extra_mods(self):
+        return self.data["extra_mods"]
+
+    def add_extra_mods(self, *mods):
+        self.data["extra_mods"] = self.data["extra_mods"] + mods
+
+    def add_extra_mods_to_destination(self):
+        self.graph.node[self.to_n]["extra_mods"] = self.data["extra_mods"]
 
     def clear_instance(self):
         self.data["instance"] = None
@@ -111,8 +125,6 @@ class Link(object):
     def destination(self):
         return self.to_n
 
-    def extra_modifiers(self):
-        return []
 
 #Builder Model Class metaclass
 class BMCMeta(type):
@@ -141,7 +153,8 @@ class BMCMeta(type):
                                                                                      "remote_attr": attr,
                                                                                      "uplink_for": dest_construct,
                                                                                      "visited_from": (),
-                                                                                     "instance": None})
+                                                                                     "instance": None,
+                                                                                     "extra_mods": ()})
                             remote_attr_found = remote_attr
                             break
                 m_graph.add_edge(bmo, value.type, attr_dict={"construct": value,
@@ -149,7 +162,8 @@ class BMCMeta(type):
                                                              "remote_attr": remote_attr_found,
                                                              "uplink_for": None,
                                                              "visited_from": (),
-                                                             "instance": None})
+                                                             "instance": None,
+                                                             "extra_mods": ()})
 
         return bmo
 

@@ -55,7 +55,6 @@ class Builder:
 
         self._make_value_constructs()
         self._apply_instance_mods()
-
         
         if is_first_run():
             self._graph_to_real_model()
@@ -88,10 +87,9 @@ class Builder:
                         setattr(instance, attr, link.destination())
 
     def _get_extra_mods(self):
-        node_mods = self.class_graph.node[self.clazzToBuild]["extra_mods"]
-        mods = node_mods[0] if node_mods else []
-        self.class_graph.node[self.clazzToBuild]["extra_mods"] = tuple(list(node_mods)[1:])
-        return mods
+        mods = self.class_graph.node[self.clazzToBuild]["extra_mods"]
+        self.class_graph.node[self.clazzToBuild]["extra_mods"] = ()
+        return list(mods)
 
     def _apply_instance_mods(self):
         # include valueconstr mod here???
