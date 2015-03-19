@@ -3,21 +3,8 @@ import inspect
 import networkx as nx
 import construct as construct
 
-#relation types
-#TODO: use enum34
-Many = "many"
-One = "one"
-Undefined = "undef"
 
 m_graph = nx.MultiDiGraph()
-relation_base = construct.Construct
-relation_types = {
-                  construct.Collection: Many,
-                  construct.Unique: One, 
-                  construct.Reused: One,
-                  construct.Uplink: One,
-                  construct.Maybe: Undefined,
-                  }
 
 
 class Link(object):
@@ -137,33 +124,29 @@ class BMCMeta(type):
         
         m_graph.add_node(bmo, attr_dict={"extra_mods": ()})
 
-        for attr, value in inspect.getmembers(bmo):
-            if not isinstance(value, construct.Construct) or value.__class__ not in relation_types.keys():
-                continue
-            if not isinstance(value, construct.Uplink):
-                remote_attr_found = None
-                for remote_attr, remote_value in value.type.__dict__.items():
-                    if isinstance(remote_value, construct.Uplink):
-                        dest_construct, dest_type = remote_value.getLinkDestination()
-                        if dest_construct == value or isinstance(value, construct.Maybe) and value.construct == dest_construct:
-                            assert dest_type is None, "Uplink is being initiated the second time!"
-                            remote_value.setDestination(remote_construct = value, type_to_build = bmo)
-                            m_graph.add_edge(value.getTypeToBuild(), bmo, attr_dict={"construct": remote_value,
-                                                                                     "local_attr": remote_attr,
-                                                                                     "remote_attr": attr,
-                                                                                     "uplink_for": dest_construct,
-                                                                                     "visited_from": (),
-                                                                                     "instance": None,
-                                                                                     "extra_mods": ()})
-                            remote_attr_found = remote_attr
-                            break
-                m_graph.add_edge(bmo, value.type, attr_dict={"construct": value,
-                                                             "local_attr": attr,
-                                                             "remote_attr": remote_attr_found,
-                                                             "uplink_for": None,
-                                                             "visited_from": (),
-                                                             "instance": None,
-                                                             "extra_mods": ()})
+        for attr, value in inspect.getmembers(bmo, predicate = lambda x: isinstance(x, construct.Construct) and not isinstance(x, construct.Uplink)):
+            remote_attr_found = None
+            for remote_attr, remote_value in inspect.getmembers(value.type, predicate = lambda x: isinstance(x, construct.Uplink)):
+                dest_construct, dest_type = remote_value.getLinkDestination()
+                if dest_construct == value or isinstance(value, construct.Maybe) and value.construct == dest_construct:
+                    assert dest_type is None, "Uplink is being initiated the second time!"
+                    remote_value.setDestination(remote_construct = value, type_to_build = bmo)
+                    m_graph.add_edge(value.getTypeToBuild(), bmo, attr_dict={"construct": remote_value,
+                                                                             "local_attr": remote_attr,
+                                                                             "remote_attr": attr,
+                                                                             "uplink_for": dest_construct,
+                                                                             "visited_from": (),
+                                                                             "instance": None,
+                                                                             "extra_mods": ()})
+                    remote_attr_found = remote_attr
+                    break
+            m_graph.add_edge(bmo, value.type, attr_dict={"construct": value,
+                                                         "local_attr": attr,
+                                                         "remote_attr": remote_attr_found,
+                                                         "uplink_for": None,
+                                                         "visited_from": (),
+                                                         "instance": None,
+                                                         "extra_mods": ()})
 
         return bmo
 
@@ -172,6 +155,14 @@ class BuilderModelClass(object):
     __metaclass__ = BMCMeta
     __object_graph__ = None
     
+    def __new__(cls):
+        obj = super(BuilderModelClass, cls).__new__(cls)
+        for _, value in inspect.getmembers(cls, predicate = lambda x: isinstance(x, construct.Uplink)):
+            dest_construct, _ = value.getLinkDestination()
+            if dest_construct is None:
+                raise ValueError("Unlinked Uplink found during init of %s class" % cls.__name__)
+        return obj
+
     def _get_field_by_value(self, value):
         for k, v in self.__dict__.items():
             if v == value:
