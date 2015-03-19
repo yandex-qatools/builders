@@ -28,17 +28,18 @@ class Link(object):
         self.data = data
         self.graph = graph
 
-    def create_object(self, modifiers, object_graph, subtree_modifiers):
+    def create_object(self, modifiers, object_graph, from_obj):
         #TODO: remember Maybe must remove edges if disabled!!!
         #import graph_utils
-        if self.from_n in self.data["visited_from"]:
+        if from_obj in self.data["visited_from"]:
             return
 
-        self.data["visited_from"] = tuple(list(self.data["visited_from"]) + [self.from_n])
+        self.data["visited_from"] = tuple(list(self.data["visited_from"]) + [from_obj])
         
         result = None
         if self.has_object():
             result = self.get_instance()
+            self.clear_instance()
         else:
             backlink = None
             if self.is_uplink():
@@ -52,7 +53,7 @@ class Link(object):
                     backlink = uplinks[0]
             
             if backlink:
-                backlink[-1]["instance"] = self.from_n
+                backlink[-1]["instance"] = from_obj
     
             #remember extra modifiers here, because we take backlink and put from_n there as value,though it can have OneOf for example...
             #Handle carefully!
@@ -61,6 +62,7 @@ class Link(object):
         if not result:
             return 
 
+        self.from_n = from_obj
         self.to_n = result
         self.add_to(object_graph)
 
@@ -78,6 +80,9 @@ class Link(object):
 
     def get_instance(self):
         return self.data["instance"]
+
+    def clear_instance(self):
+        self.data["instance"] = None
 
     def is_uplink(self):
         return isinstance(self.get_construct(), construct.Uplink)

@@ -1,7 +1,5 @@
 from builders import graph_utils
 from builders.logger import logger
-from builders.modifiers import DataIndependentModifier, \
-    DataDependentModifier
 from inspect import getmembers
 import collections
 import networkx as nx
@@ -35,7 +33,7 @@ class Builder:
         self.class_graph = None
         self.obj_graph = None
 
-    def _build(self, class_graph=None, object_graph=None, extra_subtree_modifiers=None):
+    def _build(self, class_graph=None, object_graph=None):
         from builders.model_graph import Link, m_graph
         assert (class_graph is not None and object_graph is not None) or (class_graph is None and object_graph is None), "You must either specify both class graph and object graph, or none of them!"
         self.class_graph = class_graph or graph_utils.get_new_classgraph(m_graph, for_class_to_build=self.clazzToBuild)
@@ -50,15 +48,14 @@ class Builder:
         self.result_object = self.clazzToBuild()
         self.obj_graph.add_node(self.result_object)
 
-        for link in self.class_graph.out_edges([self.clazzToBuild], keys=True, data=True):
-            lnk = Link(*link, graph=self.class_graph)
-            lnk.from_n = self.result_object
-            #remember extra modifiers here, because we take backlink and put from_n there as value,though it can have OneOf for example...
-            #Handle carefully!
-            lnk.create_object(self.modifiers, self.obj_graph, extra_subtree_modifiers)
+        links = [Link(*link, graph=self.class_graph) for link in self.class_graph.out_edges([self.clazzToBuild], keys=True, data=True)]
+        
+        for lnk in sorted(links, key=lambda x: x.is_uplink()):
+            lnk.create_object(self.modifiers, self.obj_graph, self.result_object)
 
         self._make_value_constructs()
         self._apply_instance_mods()
+
         
         if is_first_run():
             self._graph_to_real_model()
@@ -105,7 +102,6 @@ class Builder:
 
     def _apply_graph_mods(self, is_first_run, class_graph=None, object_graph=None):
         from builders.model_graph import Link
-        mods_to_apply = []
         if is_first_run:
             default_mods = list(flatten([Link(edge[0], edge[1], None, edge[2]).get_construct().getDefaultModifiers() for edge in self.class_graph.edges(data=True)]))
             mods_to_apply = default_mods + self.modifiers
@@ -116,7 +112,6 @@ class Builder:
             self.extra_modifiers = self._get_extra_mods()
             self.modifiers += self.extra_modifiers
         [m.apply(class_graph=class_graph, object_graph=object_graph) for m in self.extra_modifiers if m.shouldRun(class_graph=class_graph, object_graph=object_graph)]
-
 
     def _apply_data_independent_mods(self, is_first_run):
         self._apply_graph_mods(is_first_run, class_graph=self.class_graph)

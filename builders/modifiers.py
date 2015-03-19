@@ -215,27 +215,33 @@ class OneOf(ModelStructureModifier):
         
         self.what = what
         self.value = list(modifiers)
-        self.subtree_mod = False
+        self.only_first_run = True
+        self.executed = False
 
     def shouldRun(self, instance=None, clazz=None, class_graph=None, object_graph=None, **kwargs):
         return instance or object_graph or clazz or class_graph
 
     def apply(self, instance=None, clazz=None, class_graph=None, object_graph=None, modifiers=(), **kwargs):
-        if not self.subtree_mod:
+        if self.only_first_run and not self.executed:
             if class_graph:
-                self.subtree_mod = True
-                self.class_graph = class_graph
-                affected_nodes = self.get_affected_destination_nodes(self.class_graph)
+                self.executed = True
+                affected_nodes = self.get_affected_destination_nodes(class_graph)
+                
+                new_mod = OneOf(self.what, *self.value)
+                new_mod.only_first_run = False
+                
                 for node in affected_nodes:
-                    self.class_graph.node[node]["extra_mods"] = tuple(list(self.class_graph.node[node]["extra_mods"]) + [[self]])
+                    class_graph.node[node]["extra_mods"] = tuple(list(class_graph.node[node]["extra_mods"]) + [[new_mod]])
             return
-        else:
+        elif not self.only_first_run:
             if class_graph:
+                self.class_graph = class_graph
                 self.class_graph_saved = graph_utils.nondeepcopy_graph(self.class_graph)
             elif object_graph:
                 graph_utils.replace_graph(self.class_graph_saved, self.class_graph)
-            
+
             self.do(instance=instance, clazz=clazz, class_graph=class_graph, object_graph=object_graph)
+ 
 
     def do(self, instance, clazz, class_graph, object_graph, modifiers=()):
         for mod in self.value:

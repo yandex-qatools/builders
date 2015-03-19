@@ -1,7 +1,7 @@
-from builders.model_graph import BuilderModelClass
 from builders.builder import Builder
 from builders.construct import Maybe, Unique, Uplink, Collection, Reused
-from builders.modifiers import Enabled, NumberOf, More, OneOf
+from builders.model_graph import BuilderModelClass
+from builders.modifiers import Enabled, NumberOf, More, OneOf, InstanceModifier
 from networkx.readwrite import json_graph
 import builders.tests.drawer
 import json
@@ -38,126 +38,36 @@ def draw(obj):
             result.write(html % js)
 
 
-class D3(BuilderModelClass):
-    d2 = Uplink()
-
-
-class D2(BuilderModelClass):
-    d1 = Uplink()
-    d3 = Collection(D3, uplink=D3.d2)
-
-
-class D1(BuilderModelClass):
-    d2 = Collection(D2, uplink=D2.d1)
-
-
-d = Builder(D3).withA(NumberOf(D1.d2, 2), OneOf(D1.d2, NumberOf(D2.d3, 2))).build()
-
-#pp.pprint(u1.__object_graph__.nodes())
-#pp.pprint(u1.__object_graph__.edges(data=True))
-draw(d)
-
-'''
 class A(BuilderModelClass):
-        b = Uplink()
+    a = 0
+    b = Uplink()
 
 class B(BuilderModelClass):
-    zaa = Collection(A)
+    values = Collection(A, uplink=A.b)
     c = Uplink()
 
 class C(BuilderModelClass):
-    bb = Collection(B)
+    values = Collection(B, uplink=B.c)
 
-B.c.linksTo(C, C.bb)
-A.b.linksTo(B, B.zaa)
+#A.b.linksTo(B, B.values)
 
-builder = Builder(B).withA(HavingIn(B.zaa, 1),
-                           HavingIn(C.bb, 1))
+def test():
+    a = Builder(B).withA(NumberOf(C.values, 2), OneOf(C.values, NumberOf(B.values, 2))).build()
+        #withA(OneOf(C.values, NumberOf(B.values, 2), OneOf(B.values, InstanceModifier(A).thatSets(a=2)))).\
+        #build()
+    
+    #c = a.b.c
+#    assert len(c.values) == 2
+#    assert c.values[0] != c.values[1]
+#    assert len(c.values[0].values) == 1 and len(c.values[1].values) == 1
+#    assert c.values[0].values[0] != c.values[1].values[0]
+    return a
 
-b = builder.build()
-c = b.c
-
-
-print b.__object_graph__.nodes()
-print b.__object_graph__.edges(data=True)
-draw(b)
-
-assert len(c.bb) == 2
-assert len(c.bb[0].zaa) == 2
-assert len(c.bb[1].zaa) == 2
-'''
-
-'''
-class B(BuilderModelClass):
-    a = Uplink(links_to="A.b")
-    c = Uplink(links_to="C.b")
+#pp.pprint(u1.__object_graph__.nodes())
+#pp.pprint(u1.__object_graph__.edges(data=True))
+draw(test())
 
 
-class A(BuilderModelClass):
-    b = Collection(B)
-
-
-class C(BuilderModelClass):
-    b = Collection(B)
-
-
-print m_graph.nodes()
-print m_graph.edges(data=True)
-
-a = Builder(A).withA(NumberOf(A.b, 2)).build()
-
-draw(a)
-
-assert len(a.b) == 2
-assert a.b[0].a == a.b[1].a and a.b[0].a == a
-assert a.b[0].c != a.b[1].c
-assert len(a.b[0].c.b) == 1 and len(a.b[1].c.b) == 1
-assert a.b[0].c.b[0].c == a.b[0].c and a.b[1].c.b[0].c == a.b[1].c
-'''
-
-'''
-class A(BuilderModelClass):
-    value = 'OK'
-    b = Uplink()
-
-
-class B(BuilderModelClass):
-    a = Unique(A)
-
-
-A.b.linksTo(B, B.a)
-
-b = Builder(B).build()
-assert isinstance(b, B)
-assert isinstance(b.a, A)
-assert isinstance(b.a.b, B)
-assert b == b.a.b
-
-assert not A.b.value
-assert not B.a.value
-'''
-
-'''
-def test_key_is_unique():
-    class A(BuilderModelClass):
-        a = Key(Random(start=1, end=3))
-
-    values = [Builder(A).build().a for _ in xrange(3)]
-
-    assert sorted(list(set(values))) == sorted(values)
-
-
-def test_lambda_executed_twice():
-    from itertools import count
-    gen = count()
-
-    class A(BuilderModelClass):
-        a = Lambda(lambda _: gen.next())
-
-    values = [Builder(A).build().a for _ in xrange(2)]
-
-    assert (values[0], values[1]) == (0, 1)
-'''
 
 #print m_graph.nodes()
 #print m_graph.edges(data=True)
