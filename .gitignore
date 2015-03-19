@@ -3,6 +3,9 @@
 *.classpath
 *.project
 
+#PyCharm files
+.idea
+
 #pydev files
 *.pydevproject
 *__pycache__
