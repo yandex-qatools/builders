@@ -13,6 +13,7 @@ setuptools.setup(
     author_email="pupssman@yandex-team.ru",
     url="http://github.com/yandex-qatools/builders",
     packages=["builders"],
+    install_requires=["networkx"],
     description="Lightweight test data generation framework",
     long_description=open('README.rst').read(),
     classifiers=[
